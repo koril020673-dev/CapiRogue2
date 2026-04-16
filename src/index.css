@@ -1,0 +1,61 @@
+:root {
+  --bg: #0d1117;
+  --s1: #161b22;
+  --blue: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --text: #e6edf3;
+  --subtle: #9aa4b2;
+  --muted: #7d8590;
+  --border: #30363d;
+  --bg-elevated: #11161d;
+  color: var(--text);
+  background: var(--bg);
+  font-family:
+    'Segoe UI',
+    'Malgun Gothic',
+    'Apple SD Gothic Neo',
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at top, rgba(88, 166, 255, 0.08), transparent 35%),
+    radial-gradient(circle at bottom right, rgba(63, 185, 80, 0.06), transparent 28%),
+    var(--bg);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
