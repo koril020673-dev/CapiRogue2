@@ -1,0 +1,138 @@
+.cr2-settlement-modal__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 15, 20, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.cr2-settlement-modal {
+  width: min(640px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+  border-radius: 28px;
+  border: 1px solid var(--cr2-border);
+  background: var(--cr2-s2);
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.46);
+}
+
+.cr2-settlement-modal__top,
+.cr2-settlement-modal__summary-grid {
+  display: flex;
+}
+
+.cr2-settlement-modal__top {
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.cr2-settlement-modal__top h2 {
+  margin: 0;
+  color: var(--cr2-text);
+  font-size: 1.45rem;
+}
+
+.cr2-settlement-modal__close,
+.cr2-settlement-modal__confirm {
+  border: 1px solid var(--cr2-border);
+  color: var(--cr2-text);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.cr2-settlement-modal__close {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cr2-settlement-modal__close:hover,
+.cr2-settlement-modal__confirm:hover {
+  transform: translateY(-1px);
+  border-color: rgba(240, 165, 0, 0.34);
+}
+
+.cr2-settlement-modal__summary-grid {
+  gap: 12px;
+}
+
+.cr2-settlement-modal__summary-grid article,
+.cr2-settlement-modal__profit-block {
+  flex: 1 1 0;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--cr2-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cr2-settlement-modal__summary-grid span,
+.cr2-settlement-modal__profit-block span {
+  color: var(--cr2-dim);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cr2-settlement-modal__summary-grid strong,
+.cr2-settlement-modal__profit-block strong {
+  display: block;
+  margin-top: 10px;
+  color: var(--cr2-text);
+  font-size: 1.1rem;
+}
+
+.cr2-settlement-modal__profit-block strong {
+  font-size: 1.9rem;
+}
+
+.cr2-settlement-modal__profit--positive {
+  color: var(--cr2-positive);
+}
+
+.cr2-settlement-modal__profit--negative {
+  color: var(--cr2-negative);
+}
+
+.cr2-settlement-modal__detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--cr2-text);
+}
+
+.cr2-settlement-modal__detail-list p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.cr2-settlement-modal__warning {
+  color: var(--cr2-warning);
+}
+
+.cr2-settlement-modal__confirm {
+  align-self: flex-start;
+  padding: 12px 18px;
+  border-radius: 16px;
+  background: rgba(240, 165, 0, 0.12);
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .cr2-settlement-modal__summary-grid {
+    flex-direction: column;
+  }
+
+  .cr2-settlement-modal__confirm {
+    width: 100%;
+  }
+}

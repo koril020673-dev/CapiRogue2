@@ -1,0 +1,135 @@
+.cr2-rival-deck,
+.cr2-rival-deck__header,
+.cr2-rival-deck__list,
+.cr2-rival-card__top,
+.cr2-rival-card__identity,
+.cr2-rival-card__stats {
+  display: flex;
+}
+
+.cr2-rival-deck {
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cr2-rival-deck__header {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cr2-rival-deck__eyebrow,
+.cr2-rival-card__stats span,
+.cr2-rival-card__health small {
+  color: var(--cr2-dim);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cr2-rival-deck__header h2 {
+  margin: 0;
+  color: var(--cr2-text);
+}
+
+.cr2-rival-deck__list {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cr2-rival-card {
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--cr2-rival-color) 28%, var(--cr2-border));
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--cr2-rival-color) 12%, transparent), transparent 40%),
+    var(--cr2-s2);
+  transition: opacity 200ms ease, filter 200ms ease;
+}
+
+.cr2-rival-card--out {
+  opacity: 0.52;
+  filter: grayscale(0.24);
+}
+
+.cr2-rival-card__top {
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cr2-rival-card__identity {
+  align-items: center;
+  gap: 12px;
+}
+
+.cr2-rival-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--cr2-rival-color) 20%, transparent);
+  color: var(--cr2-text);
+  font-weight: 700;
+}
+
+.cr2-rival-card__identity strong {
+  display: block;
+  color: var(--cr2-text);
+}
+
+.cr2-rival-card__identity small {
+  color: var(--cr2-neutral);
+}
+
+.cr2-rival-card__status {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cr2-text);
+  font-size: 0.78rem;
+}
+
+.cr2-rival-card__health {
+  margin-top: 14px;
+}
+
+.cr2-rival-card__health-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.cr2-rival-card__health-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--cr2-rival-color), rgba(255, 255, 255, 0.7));
+}
+
+.cr2-rival-card__health small {
+  display: block;
+  margin-top: 8px;
+}
+
+.cr2-rival-card__stats {
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.cr2-rival-card__stats article {
+  flex: 1 1 0;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--cr2-border);
+}
+
+.cr2-rival-card__stats strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--cr2-text);
+}

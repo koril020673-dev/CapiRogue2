@@ -1,0 +1,109 @@
+.cr2-event-modal__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 15, 20, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.cr2-event-modal {
+  width: min(680px, 100%);
+  padding: 24px;
+  border-radius: 28px;
+  border: 1px solid var(--cr2-border);
+  background:
+    radial-gradient(circle at top right, rgba(240, 165, 0, 0.12), transparent 34%),
+    var(--cr2-s1);
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.5);
+}
+
+.cr2-event-modal__top,
+.cr2-event-modal__tags,
+.cr2-event-modal__choices {
+  display: flex;
+}
+
+.cr2-event-modal__top {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.cr2-event-modal__eyebrow {
+  color: var(--cr2-dim);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cr2-event-modal__top h2 {
+  margin: 8px 0 0;
+  color: var(--cr2-text);
+}
+
+.cr2-event-modal__close,
+.cr2-event-modal__choice {
+  border: 1px solid var(--cr2-border);
+  color: var(--cr2-text);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.cr2-event-modal__close {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cr2-event-modal__close:hover,
+.cr2-event-modal__choice:hover {
+  transform: translateY(-1px);
+  border-color: rgba(240, 165, 0, 0.32);
+}
+
+.cr2-event-modal__description {
+  margin: 18px 0 0;
+  color: var(--cr2-neutral);
+  line-height: 1.7;
+}
+
+.cr2-event-modal__tags {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.cr2-event-modal__tags span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(240, 165, 0, 0.12);
+  color: var(--cr2-warning);
+  font-size: 0.78rem;
+}
+
+.cr2-event-modal__choices {
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.cr2-event-modal__choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  text-align: left;
+}
+
+.cr2-event-modal__choice span {
+  color: var(--cr2-neutral);
+}

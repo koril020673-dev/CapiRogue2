@@ -1,21 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 :root {
-  --bg: #0d1117;
-  --s1: #161b22;
-  --blue: #58a6ff;
-  --green: #3fb950;
-  --red: #f85149;
-  --text: #e6edf3;
-  --subtle: #9aa4b2;
-  --muted: #7d8590;
-  --border: #30363d;
-  --bg-elevated: #11161d;
-  color: var(--text);
-  background: var(--bg);
-  font-family:
-    'Segoe UI',
-    'Malgun Gothic',
-    'Apple SD Gothic Neo',
-    sans-serif;
+  --cr2-bg: #0f0f14;
+  --cr2-s1: #17171f;
+  --cr2-s2: #1e1e28;
+  --cr2-s3: #26263300;
+  --cr2-border: rgba(255, 255, 255, 0.08);
+
+  --cr2-accent: #f0a500;
+  --cr2-accent-dim: #7a5200;
+
+  --cr2-positive: #4ade80;
+  --cr2-negative: #ff6b6b;
+  --cr2-warning: #facc15;
+  --cr2-neutral: #94a3b8;
+
+  --cr2-text: #f0ede8;
+  --cr2-dim: #6b7280;
+
+  color: var(--cr2-text);
+  background: var(--cr2-bg);
+  font-family: 'Inter', system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -36,9 +41,10 @@ body {
   margin: 0;
   min-width: 320px;
   background:
-    radial-gradient(circle at top, rgba(88, 166, 255, 0.08), transparent 35%),
-    radial-gradient(circle at bottom right, rgba(63, 185, 80, 0.06), transparent 28%),
-    var(--bg);
+    radial-gradient(circle at top left, rgba(167, 139, 250, 0.14), transparent 28%),
+    radial-gradient(circle at top right, rgba(240, 165, 0, 0.12), transparent 32%),
+    radial-gradient(circle at bottom, rgba(52, 211, 153, 0.08), transparent 30%),
+    var(--cr2-bg);
 }
 
 button,
@@ -48,14 +54,16 @@ textarea {
   font: inherit;
 }
 
-button:focus-visible {
-  outline: 2px solid var(--blue);
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--cr2-accent) 70%, white);
   outline-offset: 2px;
 }
 
 h1,
 h2,
 h3,
+h4,
 p {
   margin: 0;
 }
