@@ -1,579 +1,431 @@
 import { create } from 'zustand'
 import { ADVISORS } from '../constants/advisors.js'
+import { BLACK_SWANS } from '../constants/blackSwans.js'
+import { DIFFICULTIES } from '../constants/difficulties.js'
+import { ECO_DISPLAY, ECO_WEIGHTS } from '../constants/economy.js'
+import { ECONOMIC_WARS } from '../constants/economicWars.js'
+import { getEducationHint } from '../constants/educationHints.js'
 import { drawWeightedEventCards, getEventCardById } from '../constants/eventCards.js'
-import { RIVALS, RIVAL_ORDER, createInitialRivals } from '../constants/rivals.js'
-import { VENDORS } from '../constants/vendors.js'
+import { LEGACY_CONDITIONS } from '../constants/legacy.js'
+import { CREDIT_SHOP } from '../constants/rewards.js'
+import {
+  RIVAL_NAMES,
+  RIVALS,
+  RIVAL_ORDER,
+  createInitialRivals,
+} from '../constants/rivals.js'
+import { STRATEGIES, VENDOR, VENDOR_MODE_MUL } from '../constants/strategies.js'
+import { clamp, roundTo } from '../lib/gameMath.js'
+import { getCreditShopPrice } from '../logic/creditEngine.js'
 import { calcDemand } from '../logic/demandEngine.js'
 import { advanceEconPhase } from '../logic/econEngine.js'
-import { calcAttraction, calcMarketShares } from '../logic/marketEngine.js'
+import { applyHealth, calcHealthDelta } from '../logic/healthEngine.js'
+import { calcAttraction } from '../logic/marketEngine.js'
+import {
+  loadLegacyCards,
+  loadMeta,
+  recordGameEnd,
+  saveLegacyCards,
+} from '../logic/metaEngine.js'
+import { getMomentumEffect, updateMomentum } from '../logic/momentumEngine.js'
+import { createRewardDraft } from '../logic/rewardEngine.js'
+import {
+  applyRivalHealthDamage,
+  applyShareDamage,
+  calcRivalShares,
+  ensureRivalsJoined,
+  updateRivalsFromSettlement,
+} from '../logic/rivalEngine.js'
 import { calcSettlement } from '../logic/settlementEngine.js'
-import { clamp, evaluateRivalStatus, getDebtBand, roundTo } from '../lib/gameMath.js'
 
-const PRICE_MIN = 40000
-const PRICE_MAX = 180000
-const ORDER_QTY_MAX = 10000
-const HISTORY_LIMIT = 14
-const EVENT_CURRENCY_UNIT = 1000000
-const EVENT_PRICE_UNIT = 3000
-
-const ECONOMY_LABELS = {
-  boom: '호황',
-  stable: '평시',
-  recession: '불황',
-}
-
-const ECONOMY_SUMMARIES = {
-  boom: '소비 심리가 살아 있어 가격 인상 여력이 생기는 구간입니다.',
-  stable: '가격과 품질의 균형이 점유율을 좌우하는 표준 구간입니다.',
-  recession: '가격 민감도가 커지고 고티어 상품 수요가 빠르게 줄어드는 구간입니다.',
-}
-
-const ECONOMY_BIAS_PHASE_MAP = {
-  boom: 'boom',
-  stable: 'steady',
-  recession: 'slowdown',
-}
-
-const QUALITY_MODE_MULTIPLIER = {
-  budget: 0.8,
-  balanced: 1,
-  standard: 1,
-  premium: 1.5,
-}
-
-const DETERMINISTIC_ECO_WEIGHTS = {
-  essential: { boom: 0.9, stable: 1, recession: 1.3 },
-  normal: { boom: 1.2, stable: 1, recession: 0.8 },
-  luxury: { boom: 1.8, stable: 1, recession: 0.4 },
-}
-
-const TIER_RECESSION_MUL = {
-  1: 1,
-  2: 0.85,
-  3: 0.55,
-  4: 0.1,
-}
+const MAX_HEALTH = 10
 
 function createToast(message, tone = 'neutral') {
   return {
-    id: `toast-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     message,
     tone,
   }
 }
 
-function getVendorById(vendorId) {
-  return VENDORS.find((vendor) => vendor.id === vendorId) ?? null
+function getEffectValue(state, type) {
+  return (state.activeEffects ?? [])
+    .filter((effect) => effect.type === type)
+    .reduce((sum, effect) => sum + Number(effect.value ?? 0), 0)
 }
 
-function getFactoryActive(state) {
-  return Boolean(state.factory?.built) && (state.factory?.buildTurnsLeft ?? 0) <= 0
+function hasEffect(state, type) {
+  return (state.activeEffects ?? []).some((effect) => effect.type === type)
 }
 
-function getBlackSwanDemandMultiplier(state) {
-  return state._blackSwanDemandMul ?? (state.floor >= 80 ? 0.9 : 1)
+function nextEffectList(activeEffects = []) {
+  return activeEffects
+    .map((effect) => ({
+      ...effect,
+      turnsLeft:
+        effect.turnsLeft === undefined || effect.turnsLeft === null
+          ? effect.turnsLeft
+          : effect.turnsLeft - 1,
+    }))
+    .filter((effect) => effect.turnsLeft === undefined || effect.turnsLeft === null || effect.turnsLeft > 0)
 }
 
-function getEventDemandMultiplier(state) {
-  return clamp(1 + (state.demandAdjustment ?? 0) / 100, 0.25, 2)
+function createEventContext(state) {
+  const economyPhase =
+    state.econPhase === 'growth'
+      ? 'recovery'
+      : state.econPhase === 'contraction' || state.econPhase === 'recession'
+        ? 'slowdown'
+        : state.econPhase === 'stable'
+          ? 'steady'
+          : 'boom'
+
+  return {
+    economyPhase,
+    debtBand:
+      state.debt > state.capital * 0.5 ? 'high' : state.debt > state.capital * 0.2 ? 'medium' : 'low',
+    factoryCount: state.factory.built ? 1 : 0,
+    activeRivals: RIVAL_ORDER.filter((rivalId) => state.rivals?.[rivalId]?.active),
+    month: state.floor,
+  }
 }
 
-function getMonthlyInterest(state) {
-  return Math.round((state.debt * state.interestRate) / 12)
+function drawCurrentEvent(state) {
+  return drawWeightedEventCards(createEventContext(state), 1)[0]?.id ?? null
 }
 
-function getMonthlyRent(state) {
-  if (state.realty === 'monthly') {
-    return 1000000
+function applyLegacyBonuses(baseState, legacyCards) {
+  let capitalMul = 1
+  let startCredit = 0
+  let startBrand = 0
+  let startQuality = 0
+  let startResistance = 0
+
+  legacyCards.forEach((card) => {
+    capitalMul += card.bonus?.startCapitalMul ? card.bonus.startCapitalMul - 1 : 0
+    startCredit += card.bonus?.startCredit ?? 0
+    startBrand += card.bonus?.startBrand ?? 0
+    startQuality += card.bonus?.startQuality ?? 0
+    startResistance += card.bonus?.startResistance ?? 0
+  })
+
+  return {
+    ...baseState,
+    capital: Math.round(baseState.capital * capitalMul),
+    credits: baseState.credits + startCredit,
+    brandValue: baseState.brandValue + startBrand,
+    qualityScore: baseState.qualityScore + startQuality,
+    priceResistance: baseState.priceResistance + startResistance,
+  }
+}
+
+function getAdvisorFee(advisorId, netProfit) {
+  const advisor = ADVISORS[advisorId]
+  if (!advisor?.fee) {
+    return 0
   }
 
-  if (state.realty === 'jeonse') {
-    return 250000
+  if (advisor.fee.type === 'percent') {
+    if (netProfit > 0) {
+      return Math.round(netProfit * advisor.fee.value)
+    }
+    return advisor.fee.lossFixed ?? 0
+  }
+
+  if (advisor.fee.type === 'fixed') {
+    return advisor.fee.value
   }
 
   return 0
 }
 
-function getSafetyCost(state) {
-  return getFactoryActive(state) && state.factory?.safetyOn ? 5000000 : 0
-}
-
-function getAdjustedVendorUnitCost(state) {
-  if (!state.selectedVendor) {
-    return 0
-  }
-
-  return Math.max(
-    1000,
-    Math.round(state.selectedVendor.unitCost + (state.costAdjustment ?? 0) * 1000),
-  )
-}
-
-function calculateEffectiveQuality(state) {
-  return roundTo(
-    (state.selectedVendor?.qualityScore ?? 0) +
-      (state.qualityScore ?? 0) +
-      (state.factory?.upgradeLevel ?? 0) * 20,
-    1,
-  )
-}
-
-function calculateAwarenessBonus(state) {
-  return roundTo(
-    clamp(
-      state.marketing?.awarenessBonus ?? (state.marketingSpend ?? 0) / 100,
-      0,
-      0.45,
-    ),
-    3,
-  )
-}
-
-function estimateDemandPreview(state) {
-  const ecoWeight =
-    DETERMINISTIC_ECO_WEIGHTS[state.itemCategory]?.[state.economyPhase] ?? 1
-  const recessionTierMul =
-    state.economyPhase === 'recession'
-      ? (TIER_RECESSION_MUL[state.industryTier] ?? 1)
-      : 1
-
-  return Math.round(
-    1000 *
-      ecoWeight *
-      recessionTierMul *
-      getBlackSwanDemandMultiplier(state) *
-      getEventDemandMultiplier(state),
-  )
-}
-
-function createRivalAttraction(state, rivalId, rivalState) {
-  const rivalDefinition = RIVALS[rivalId]
-  const resistance = clamp(0.06 + rivalDefinition.aggression * 0.05, 0, 0.35)
-  const awarenessBonus = clamp((rivalState.marketShare ?? 0) / 200, 0, 0.25)
-
-  return calcAttraction({
-    quality: rivalDefinition.qualityPower,
-    brand: rivalDefinition.brandPower,
-    sellPrice: rivalState.currentPrice,
-    resistance,
-    category: state.itemCategory,
-    econPhase: state.economyPhase,
-    awarenessBonus,
-  })
-}
-
-function deriveSharePreview(state) {
-  if (!state.selectedVendor || state.price <= 0) {
-    return {
-      playerShare: clamp((state.marketShare ?? 0) / 100, 0, 1),
-      rivalShares: Object.fromEntries(
-        RIVAL_ORDER.map((rivalId) => [
-          rivalId,
-          clamp((state.rivals?.[rivalId]?.marketShare ?? 0) / 100, 0, 1),
-        ]),
-      ),
-    }
-  }
-
-  const playerAttraction = calcAttraction({
-    quality: calculateEffectiveQuality(state),
-    brand: state.brandValue,
-    sellPrice: state.price,
-    resistance: state.priceResistance,
-    category: state.itemCategory,
-    econPhase: state.economyPhase,
-    awarenessBonus: calculateAwarenessBonus(state),
-  })
-
-  const allPlayers = [{ attraction: playerAttraction }]
-
-  RIVAL_ORDER.forEach((rivalId) => {
-    const rivalState = state.rivals?.[rivalId]
-
-    if (!rivalState || rivalState.eliminated) {
-      allPlayers.push({ attraction: 0 })
-      return
-    }
-
-    allPlayers.push({
-      attraction: createRivalAttraction(state, rivalId, rivalState),
-    })
-  })
-
-  const shares = calcMarketShares(allPlayers)
+function createBaseState() {
+  const meta = loadMeta()
+  const legacyCards = loadLegacyCards()
 
   return {
-    playerShare: shares[0] ?? 0,
-    rivalShares: Object.fromEntries(
-      RIVAL_ORDER.map((rivalId, index) => [rivalId, shares[index + 1] ?? 0]),
-    ),
-  }
-}
-
-function projectRivalPrice(rivalId, state) {
-  const rivalState = state.rivals[rivalId]
-  const rivalDefinition = RIVALS[rivalId]
-
-  if (!rivalState) {
-    return rivalDefinition.basePrice
-  }
-
-  if (rivalId === 'megaflex') {
-    return clamp(
-      Math.min(state.price - 3000, rivalState.currentPrice + 1000),
-      42000,
-      125000,
-    )
-  }
-
-  if (rivalId === 'aura') {
-    return clamp(
-      Math.max(state.price + 8000, rivalState.currentPrice),
-      60000,
-      165000,
-    )
-  }
-
-  if (rivalId === 'memecatch') {
-    return clamp(
-      (rivalState.currentPrice + state.price) / 2 + 2500,
-      50000,
-      145000,
-    )
-  }
-
-  return clamp(
-    Math.max(state.price + 12000, rivalState.currentPrice),
-    70000,
-    190000,
-  )
-}
-
-function normalizeRivals(state) {
-  return RIVAL_ORDER.reduce((rivalState, rivalId) => {
-    const rivalDefinition = RIVALS[rivalId]
-    const current = state.rivals?.[rivalId] ?? {}
-    const capital = Math.max(current.capital ?? rivalDefinition.initialCapital, 0)
-    const eliminated = capital <= 0
-    const currentPrice = Math.round(
-      clamp(current.currentPrice ?? rivalDefinition.basePrice, 30000, 220000),
-    )
-    const marketShare = roundTo(
-      clamp(eliminated ? 0 : current.marketShare ?? rivalDefinition.startingShare, 0, 75),
-      1,
-    )
-
-    const nextRival = {
-      ...current,
-      id: rivalId,
-      active: true,
-      capital,
-      initialCapital: rivalDefinition.initialCapital,
-      currentPrice,
-      marketShare,
-      eliminated,
-    }
-
-    nextRival.status = evaluateRivalStatus({
-      rivalState: nextRival,
-      initialCapital: rivalDefinition.initialCapital,
-      playerPrice: state.price,
-    })
-
-    rivalState[rivalId] = nextRival
-    return rivalState
-  }, {})
-}
-
-function deriveMetrics(state) {
-  const sharePreview = deriveSharePreview(state)
-  const expectedDemand = estimateDemandPreview(state)
-  const unitCost = getAdjustedVendorUnitCost(state)
-  const qualityMultiplier = QUALITY_MODE_MULTIPLIER[state.qualityMode] ?? 1
-  const effectiveUnitCost = Math.round(
-    unitCost * qualityMultiplier * (getFactoryActive(state) ? 0.6 : 1),
-  )
-  const fixedCosts =
-    getMonthlyInterest(state) +
-    getMonthlyRent(state) +
-    getSafetyCost(state) +
-    state.monthlyFixedCost
-  const contributionMargin = state.price - effectiveUnitCost
-  const breakEvenUnits =
-    contributionMargin > 0 ? Math.ceil(fixedCosts / contributionMargin) : null
-  const demandSoldPreview = Math.round(expectedDemand * sharePreview.playerShare)
-  const projectedUnits = Math.min(demandSoldPreview, state.orderQty)
-  const projectedRevenue = projectedUnits * state.price
-  const projectedProfit =
-    projectedRevenue - effectiveUnitCost * state.orderQty - fixedCosts
-
-  return {
-    unitCost: effectiveUnitCost,
-    fixedCosts,
-    contributionMargin,
-    breakEvenUnits,
-    marketSize: expectedDemand,
-    projectedUnits,
-    projectedProfit,
-    belowCost: state.price < effectiveUnitCost,
-    debtBand: getDebtBand(state),
-    debtBandLabel:
-      {
-        low: '낮음',
-        medium: '중간',
-        high: '높음',
-      }[getDebtBand(state)] ?? '낮음',
-    economyLabel: ECONOMY_LABELS[state.economyPhase] ?? '평시',
-    economySummary: ECONOMY_SUMMARIES[state.economyPhase] ?? ECONOMY_SUMMARIES.stable,
-    sharePreview: roundTo(sharePreview.playerShare * 100, 1),
-    effectiveQuality: calculateEffectiveQuality(state),
-  }
-}
-
-function createEventContext(state) {
-  return {
-    economyPhase: ECONOMY_BIAS_PHASE_MAP[state.economyPhase] ?? 'steady',
-    debtBand: getDebtBand(state),
-    factoryCount: state.factoryCount,
-    activeRivals: RIVAL_ORDER.filter((rivalId) => !state.rivals[rivalId]?.eliminated),
-    month: state.month,
-  }
-}
-
-function createFreshEventState(state) {
-  return {
-    offeredIds: drawWeightedEventCards(createEventContext(state), 3).map((card) => card.id),
-    resolved: false,
-    skipped: false,
-    usedCardId: null,
-    usedSlotIndex: null,
-    openCardId: null,
-    openSlotIndex: null,
-  }
-}
-
-function recalculateState(sourceState, options = {}) {
-  const { preserveEvents = true } = options
-  const normalized = {
-    ...sourceState,
-    marketing: {
-      awarenessBonus: calculateAwarenessBonus(sourceState),
-      totalSpent: sourceState.marketing?.totalSpent ?? 0,
+    floor: 1,
+    maxFloors: 120,
+    gameStatus: 'idle',
+    floorPhase: 'normal',
+    advisor: null,
+    advisorDraft: null,
+    difficulty: null,
+    difficultyDraft: null,
+    companyHealth: 10,
+    maxHealth: MAX_HEALTH,
+    momentum: 0,
+    momentumHistory: [],
+    credits: 0,
+    econPhase: 'stable',
+    industryTier: 1,
+    itemCategory: 'normal',
+    capital: 0,
+    debt: 0,
+    interestRate: 0,
+    monthlyFixedCost: 500000,
+    realty: 'monthly',
+    brandValue: 0,
+    qualityScore: 60,
+    priceResistance: 0,
+    marketing: { awarenessBonus: 0 },
+    factory: {
+      built: false,
+      buildTurnsLeft: 0,
+      safetyOn: true,
+      accidentRisk: 0,
+      upgradeLevel: 0,
     },
-    rivals: normalizeRivals(sourceState),
+    rivals: createInitialRivals(),
+    activeEconomicWar: null,
+    activeBlackSwan: null,
+    blackSwanSeen: false,
+    activeEffects: [],
+    lastSettlement: null,
+    settlementModalOpen: false,
+    profitHistory: [],
+    cumulativeProfit: 0,
+    legacyCards,
+    meta,
+    advisorFeeTotal: 0,
+    warWinCount: 0,
+    currentEventCardId: null,
+    currentEventResolved: false,
+    currentEventChoiceId: null,
+    lastEventResult: null,
+    selectedStrategyId: null,
+    rewardPending: null,
+    rewardSelection: null,
+    shopOpen: false,
+    shopPurchasesThisFloor: [],
+    toasts: [],
+    decisionLog: [],
+    peakMarketShare: 0,
+    warPaused: false,
+    previewOpen: false,
+  }
+}
+
+function createRunState({ advisor, difficulty, meta, legacyCards }) {
+  const difficultyDef = DIFFICULTIES[difficulty]
+  const base = applyLegacyBonuses(
+    {
+      ...createBaseState(),
+      advisor,
+      advisorDraft: advisor,
+      difficulty,
+      difficultyDraft: difficulty,
+      gameStatus: 'playing',
+      capital: difficultyDef.capital,
+      debt: difficultyDef.debt,
+      interestRate: difficultyDef.interestRate,
+      companyHealth:
+        advisor === 'strategist'
+          ? MAX_HEALTH
+          : advisor === 'actuary'
+            ? MAX_HEALTH
+            : 10,
+      meta,
+      legacyCards,
+      priceResistance:
+        (advisor === 'trader' ? 0.01 : 0) +
+        (advisor === 'auditor' ? 0 : 0),
+      qualityScore: 60,
+    },
+    legacyCards,
+  )
+
+  const next = {
+    ...base,
+    currentEventCardId: null,
   }
 
-  const metrics = deriveMetrics(normalized)
-  const eventState =
-    preserveEvents && normalized.eventState?.offeredIds?.length
-      ? normalized.eventState
-      : createFreshEventState(normalized)
+  next.currentEventCardId = drawCurrentEvent({
+    ...next,
+    rivals: ensureRivalsJoined(next.rivals, 1, next.industryTier),
+  })
+
+  return next
+}
+
+function composeTurnPlan(state, strategyId) {
+  const strategy = STRATEGIES[strategyId]
+  if (!strategy) {
+    return null
+  }
+
+  const vendorMode = VENDOR_MODE_MUL[strategy.vendorMode]
+  const baseUnitCost = VENDOR.baseUnitCost * vendorMode.costMul
+  const tempCostMul = getEffectValue(state, 'tempCostMul')
+  const vendorUnitCost = Math.round(baseUnitCost * (1 + tempCostMul))
+  const factoryDiscount = state.factory.built ? 0.6 : 1
+  const qualityMul =
+    strategy.qualityMode === 'budget'
+      ? 0.8
+      : strategy.qualityMode === 'premium'
+        ? 1.5
+        : 1
+  const predictedDemand = Math.round(
+    1000 *
+      (ECO_WEIGHTS[state.itemCategory]?.[state.econPhase] ?? 1) *
+      (1 + getMomentumEffect(state.momentum).demandMul) *
+      (state.activeBlackSwan?.demandMul ?? 1) *
+      (1 + getEffectValue(state, 'demandMul')),
+  )
 
   return {
-    ...normalized,
-    metrics,
-    eventState,
+    strategyId,
+    orderQty: Math.max(50, Math.round(predictedDemand * strategy.orderMul)),
+    sellPrice: Math.round(vendorUnitCost * strategy.priceMul),
+    vendorUnitCost,
+    qualityMode: strategy.qualityMode,
+    vendorMode: strategy.vendorMode,
+    previewUnitCost: Math.round(vendorUnitCost * qualityMul * factoryDiscount),
+    quality:
+      VENDOR.baseQuality +
+      vendorMode.qualityBonus +
+      state.qualityScore +
+      (strategy.qualityMode === 'premium' ? 20 : 0),
+    awareness:
+      (state.marketing?.awarenessBonus ?? 0) + Number(strategy.awarenessBonus ?? 0),
+    predictedDemand,
   }
 }
 
-function pushHistoryEntry(history, entry) {
-  return [entry, ...(history ?? [])].slice(0, HISTORY_LIMIT)
-}
-
-function applyEffects(state, effects = {}) {
-  const nextMarketingSpend = roundTo(
-    clamp((state.marketingSpend ?? 12) + (effects.marketingDelta ?? 0), 0, 60),
-    1,
-  )
-  const nextFactoryCount = clamp(
-    (state.factoryCount ?? 0) + (effects.factoryDelta ?? 0),
-    0,
-    4,
-  )
-
+function applyEventEffects(state, effects = {}) {
   const nextState = {
     ...state,
-    capital: roundTo(
-      state.capital + (effects.capitalDelta ?? 0) * EVENT_CURRENCY_UNIT,
-      1,
-    ),
-    debt: roundTo(
-      Math.max(state.debt + (effects.debtDelta ?? 0) * EVENT_CURRENCY_UNIT, 0),
-      1,
-    ),
-    marketShare: roundTo(clamp(state.marketShare + (effects.marketShareDelta ?? 0), 1, 75), 1),
-    brandValue: roundTo(clamp(state.brandValue + (effects.brandDelta ?? 0), 0, 160), 1),
-    qualityScore: roundTo(clamp(state.qualityScore + (effects.qualityDelta ?? 0), 0, 160), 1),
-    marketingSpend: nextMarketingSpend,
-    factoryCount: nextFactoryCount,
-    costAdjustment: roundTo(
-      clamp((state.costAdjustment ?? 0) + (effects.costAdjustmentDelta ?? 0), -15, 15),
-      2,
-    ),
-    demandAdjustment: roundTo(
-      clamp((state.demandAdjustment ?? 0) + (effects.demandAdjustmentDelta ?? 0), -30, 30),
-      1,
-    ),
-    factory: {
-      ...state.factory,
-      built: nextFactoryCount > 0,
-      buildTurnsLeft: Math.max(
-        (state.factory?.buildTurnsLeft ?? 0) - ((effects.factoryDelta ?? 0) > 0 ? 1 : 0),
-        0,
-      ),
-      upgradeLevel: clamp(
-        (state.factory?.upgradeLevel ?? 0) + (effects.rdTierDelta ?? 0),
-        0,
-        4,
-      ),
-    },
+    capital: state.capital + (effects.capitalDelta ?? 0) * 1000000,
+    debt: Math.max(0, state.debt + (effects.debtDelta ?? 0) * 1000000),
+    brandValue: state.brandValue + (effects.brandDelta ?? 0),
+    qualityScore: state.qualityScore + (effects.qualityDelta ?? 0),
     marketing: {
-      awarenessBonus: roundTo(clamp(nextMarketingSpend / 100, 0, 0.45), 3),
-      totalSpent:
-        (state.marketing?.totalSpent ?? 0) +
-        Math.max(effects.marketingDelta ?? 0, 0) * EVENT_CURRENCY_UNIT,
+      ...state.marketing,
+      awarenessBonus: clamp(
+        (state.marketing?.awarenessBonus ?? 0) + (effects.awarenessDelta ?? 0),
+        0,
+        0.5,
+      ),
     },
-    rivals: {
-      ...state.rivals,
-    },
+    activeEffects: [...(state.activeEffects ?? [])],
   }
 
-  if (effects.rivalCapitalDelta || effects.rivalPriceDelta || effects.rivalShareDelta) {
-    RIVAL_ORDER.forEach((rivalId) => {
-      const current = nextState.rivals[rivalId]
+  if (effects.demandMul) {
+    nextState.activeEffects.push({
+      id: `demand-${Date.now()}`,
+      type: 'demandMul',
+      value: effects.demandMul,
+      turnsLeft: effects.turnsLeft ?? 1,
+    })
+  }
 
-      nextState.rivals[rivalId] = {
-        ...current,
-        capital: Math.max(
-          current.capital + (effects.rivalCapitalDelta?.[rivalId] ?? 0) * EVENT_CURRENCY_UNIT,
-          0,
-        ),
-        currentPrice: Math.round(
-          clamp(
-            current.currentPrice +
-              (effects.rivalPriceDelta?.[rivalId] ?? 0) * EVENT_PRICE_UNIT,
-            30000,
-            220000,
-          ),
-        ),
-        marketShare: roundTo(
-          clamp(current.marketShare + (effects.rivalShareDelta?.[rivalId] ?? 0), 0, 70),
-          1,
-        ),
-      }
+  if (effects.healthDelta) {
+    nextState.companyHealth = applyHealth(
+      nextState.companyHealth,
+      effects.healthDelta,
+      nextState.maxHealth,
+    )
+  }
+
+  return nextState
+}
+
+function applyRewardEffect(state, reward) {
+  const nextState = {
+    ...state,
+    credits: state.credits + (reward.effect?.credits ?? 0),
+    brandValue: state.brandValue + (reward.effect?.brandValue ?? 0),
+    qualityScore: state.qualityScore + (reward.effect?.qualityScore ?? 0),
+    priceResistance: state.priceResistance + (reward.effect?.priceResistance ?? 0),
+    capital:
+      reward.effect?.capitalMul
+        ? Math.round(state.capital * (1 + reward.effect.capitalMul))
+        : state.capital,
+    monthlyFixedCost:
+      reward.effect?.fixedCostMul
+        ? Math.round(state.monthlyFixedCost * (1 + reward.effect.fixedCostMul))
+        : state.monthlyFixedCost,
+    interestRate:
+      reward.effect?.interestRateMul
+        ? state.interestRate * (1 + reward.effect.interestRateMul)
+        : state.interestRate,
+    companyHealth: reward.effect?.fullHeal
+      ? state.maxHealth
+      : applyHealth(state.companyHealth, reward.effect?.companyHealth ?? 0, state.maxHealth),
+    activeEffects: [...(state.activeEffects ?? [])],
+  }
+
+  if (reward.effect?.tempCostMul) {
+    nextState.activeEffects.push({
+      id: `temp-cost-${Date.now()}`,
+      type: 'tempCostMul',
+      value: reward.effect.tempCostMul,
+      turnsLeft: reward.effect.turnsLeft ?? 1,
     })
   }
 
   return nextState
 }
 
-function settleRivalsAfterMonth(state, demand, sharePreview) {
-  return RIVAL_ORDER.reduce((rivalState, rivalId) => {
-    const rivalDefinition = RIVALS[rivalId]
-    const current = state.rivals[rivalId]
+function resolveLegacyCards(state, status) {
+  const netWorth = state.capital - state.debt
+  const nextCards = [...state.legacyCards]
 
-    if (!current || current.eliminated) {
-      rivalState[rivalId] = {
-        ...current,
-        marketShare: 0,
-        status: '퇴출',
-        eliminated: true,
-      }
-      return rivalState
+  LEGACY_CONDITIONS.forEach((entry) => {
+    let unlocked = false
+    if (entry.id === 'early_bankrupt' && status === 'bankrupt' && state.floor < 40) unlocked = true
+    if (entry.id === 'mid_bankrupt' && status === 'bankrupt' && state.floor >= 40 && state.floor < 80) unlocked = true
+    if (entry.id === 'late_bankrupt' && status === 'bankrupt' && state.floor >= 80) unlocked = true
+    if (entry.id === 'clear_basic' && status === 'clear') unlocked = true
+    if (entry.id === 'clear_100m' && status === 'clear' && netWorth >= 100000000) unlocked = true
+    if (entry.id === 'clear_500m' && status === 'clear' && netWorth >= 500000000) unlocked = true
+    if (entry.id === 'war_winner' && state.warWinCount >= 3) unlocked = true
+    if (entry.id === 'fee_zero' && state.advisorFeeTotal <= 0) unlocked = true
+
+    if (unlocked && !nextCards.some((card) => card.id === entry.id)) {
+      nextCards.push(entry)
     }
+  })
 
-    const nextPrice = projectRivalPrice(rivalId, state)
-    const share = roundTo((sharePreview.rivalShares[rivalId] ?? 0) * 100, 1)
-    const soldUnits = Math.round(demand * (share / 100))
-    const costRatio =
-      rivalId === 'megaflex' ? 0.72 : rivalId === 'nexuscore' ? 0.58 : 0.64
-    const variableCost = Math.round(soldUnits * nextPrice * costRatio)
-    const revenue = soldUnits * nextPrice
-    const fixedDrag = Math.round(850000 + rivalDefinition.initialCapital * 0.003)
-    const netProfit = revenue - variableCost - fixedDrag
-    const capital = Math.max(current.capital + netProfit, 0)
-    const eliminated = capital <= 0
-
-    const nextRival = {
-      ...current,
-      capital,
-      currentPrice: nextPrice,
-      marketShare: eliminated ? 0 : share,
-      eliminated,
-    }
-
-    nextRival.status = evaluateRivalStatus({
-      rivalState: nextRival,
-      initialCapital: rivalDefinition.initialCapital,
-      playerPrice: state.price,
-    })
-
-    rivalState[rivalId] = nextRival
-    return rivalState
-  }, {})
+  saveLegacyCards(nextCards)
+  return nextCards
 }
 
-function buildInitialState() {
-  const defaultVendor = VENDORS[0] ?? null
+function maybeStartEconomicWar(state) {
+  const war = ECONOMIC_WARS[state.floor]
+  if (!war) {
+    return state.activeEconomicWar
+  }
 
-  return recalculateState(
-    {
-      advisor: 'analyst',
-      sidebarCollapsed: false,
-      month: 1,
-      floor: 1,
-      economyPhase: 'stable',
-      price: 76000,
-      qualityMode: 'balanced',
-      itemCategory: 'normal',
-      industryTier: 1,
-      selectedVendor: defaultVendor,
-      orderQty: 420,
-      capital: 50000000,
-      debt: 0,
-      interestRate: 0.06,
-      realty: 'monthly',
-      monthlyFixedCost: 500000,
-      marketShare: 18.4,
-      brandValue: 28,
-      qualityScore: 24,
-      priceResistance: 0.06,
-      marketingSpend: 12,
-      marketing: {
-        awarenessBonus: 0.12,
-        totalSpent: 0,
-      },
-      factoryCount: 0,
-      factory: {
-        built: false,
-        buildTurnsLeft: 0,
-        safetyOn: true,
-        accidentRisk: 0,
-        upgradeLevel: 0,
-      },
-      costAdjustment: 0,
-      demandAdjustment: 0,
-      rivals: createInitialRivals(),
-      history: [],
-      toasts: [],
-      lastSettlement: null,
-      lastTurnReport: null,
-      settlementModalOpen: false,
-      previousEconPhase: 'stable',
-      profitHistory: [],
-      cumulativeProfit: 0,
-      eventState: {
-        offeredIds: [],
-        resolved: false,
-        skipped: false,
-        usedCardId: null,
-        usedSlotIndex: null,
-        openCardId: null,
-        openSlotIndex: null,
-      },
-    },
-    { preserveEvents: false },
-  )
+  const rivalIds =
+    war.rival === 'all'
+      ? RIVAL_ORDER.filter((rivalId) => state.rivals[rivalId]?.active)
+      : [war.rival]
+
+  return {
+    warId: war.id,
+    name: war.name,
+    rivalIds,
+    duration: war.duration,
+    floorsLeft: war.duration === 'until clear' ? 999 : war.duration,
+  }
+}
+
+function maybeTriggerBlackSwan(state) {
+  if (state.activeBlackSwan || state.floor < 80) {
+    return state.activeBlackSwan
+  }
+
+  const probability = 0.01 + Math.max(0, state.floor - 80) * 0.001
+  if (Math.random() >= probability) {
+    return null
+  }
+
+  const picked = BLACK_SWANS[Math.floor(Math.random() * BLACK_SWANS.length)]
+  return {
+    ...picked,
+    floorsLeft: picked.duration,
+  }
 }
 
 export const useGameStore = create((set, get) => {
@@ -586,98 +438,115 @@ export const useGameStore = create((set, get) => {
 
   const enqueueToast = (message, tone = 'neutral') => {
     const toast = createToast(message, tone)
-
     set((state) => ({
       ...state,
-      toasts: [...state.toasts, toast].slice(-4),
+      toasts: [...state.toasts, toast].slice(-3),
     }))
-
     setTimeout(() => dismissToast(toast.id), 2000)
   }
 
   return {
-    ...buildInitialState(),
+    ...createBaseState(),
 
     dismissToast,
 
-    resetRunState: () => set(buildInitialState()),
-
-    toggleSidebar: () =>
+    setAdvisorDraft: (advisorId) =>
       set((state) => ({
         ...state,
-        sidebarCollapsed: !state.sidebarCollapsed,
+        advisorDraft: advisorId,
       })),
 
-    selectAdvisor: (advisorId) =>
-      set((state) => {
-        if (!ADVISORS[advisorId]) {
-          return state
-        }
+    confirmAdvisor: () =>
+      set((state) => ({
+        ...state,
+        advisor: state.advisorDraft,
+      })),
 
-        return recalculateState({
-          ...state,
-          advisor: advisorId,
-        })
-      }),
+    setDifficultyDraft: (difficultyId) =>
+      set((state) => ({
+        ...state,
+        difficultyDraft: difficultyId,
+      })),
 
-    updatePrice: (nextValue) =>
-      set((state) => {
-        const parsedValue =
-          typeof nextValue === 'number' ? nextValue : Number.parseFloat(nextValue)
+    startGame: () => {
+      const state = get()
+      if (!state.advisor || !state.difficultyDraft) {
+        return
+      }
 
-        if (!Number.isFinite(parsedValue)) {
-          return state
-        }
+      const next = createRunState({
+        advisor: state.advisor,
+        difficulty: state.difficultyDraft,
+        meta: state.meta,
+        legacyCards: state.legacyCards,
+      })
 
-        return recalculateState({
-          ...state,
-          price: Math.round(clamp(parsedValue, PRICE_MIN, PRICE_MAX)),
-        })
-      }),
+      set({
+        ...next,
+        currentEventCardId: drawCurrentEvent(next),
+      })
+    },
 
-    updateQualityMode: (qualityMode) =>
-      set((state) => {
-        if (!QUALITY_MODE_MULTIPLIER[qualityMode]) {
-          return state
-        }
+    restartGame: () => {
+      const state = get()
+      if (!state.advisor || !state.difficulty) {
+        set(createBaseState())
+        return
+      }
+      const next = createRunState({
+        advisor: state.advisor,
+        difficulty: state.difficulty,
+        meta: state.meta,
+        legacyCards: state.legacyCards,
+      })
+      set({
+        ...next,
+        currentEventCardId: drawCurrentEvent(next),
+      })
+    },
 
-        return recalculateState({
-          ...state,
-          qualityMode,
-        })
-      }),
+    goToAdvisorSelect: () => set(createBaseState()),
 
-    setSelectedVendor: (vendorId) =>
-      set((state) => {
-        const vendor = getVendorById(vendorId)
+    selectStrategy: (strategyId) => {
+      set((state) => ({
+        ...state,
+        selectedStrategyId: strategyId,
+      }))
+      if (get().currentEventResolved) {
+        get().advanceFloor()
+      }
+    },
 
-        if (!vendor) {
-          return state
-        }
+    resolveEventChoice: (choiceId) => {
+      const state = get()
+      const card = getEventCardById(state.currentEventCardId)
+      const choice = card?.choices?.find((entry) => entry.id === choiceId)
+      if (!choice) {
+        return
+      }
 
-        return recalculateState({
-          ...state,
-          selectedVendor: vendor,
-        })
-      }),
+      const success = Math.random() <= choice.successRate
+      const message = success ? choice.successText : choice.failureText
+      const effects = success ? choice.successEffects : choice.failureEffects
 
-    updateOrderQty: (value) =>
-      set((state) => {
-        const parsedValue =
-          typeof value === 'number' ? value : Number.parseInt(String(value), 10)
+      set((current) => ({
+        ...applyEventEffects(current, effects),
+        currentEventResolved: true,
+        currentEventChoiceId: choiceId,
+        lastEventResult: {
+          cardId: current.currentEventCardId,
+          choiceId,
+          success,
+          message,
+          effects,
+        },
+      }))
 
-        if (!Number.isFinite(parsedValue)) {
-          return recalculateState({
-            ...state,
-            orderQty: 0,
-          })
-        }
-
-        return recalculateState({
-          ...state,
-          orderQty: Math.round(clamp(parsedValue, 0, ORDER_QTY_MAX)),
-        })
-      }),
+      enqueueToast(message, success ? 'positive' : 'negative')
+      if (get().selectedStrategyId) {
+        get().advanceFloor()
+      }
+    },
 
     closeSettlementModal: () =>
       set((state) => ({
@@ -685,249 +554,334 @@ export const useGameStore = create((set, get) => {
         settlementModalOpen: false,
       })),
 
-    openEventCard: (cardId, slotIndex) =>
-      set((state) => {
-        if (state.eventState.resolved || state.eventState.skipped) {
-          return state
-        }
-
-        if (!state.eventState.offeredIds.includes(cardId)) {
-          return state
-        }
-
-        return {
-          ...state,
-          eventState: {
-            ...state.eventState,
-            openCardId: cardId,
-            openSlotIndex: slotIndex,
-          },
-        }
-      }),
-
-    closeEventCard: () =>
+    selectReward: (rewardId) =>
       set((state) => ({
         ...state,
-        eventState: {
-          ...state.eventState,
-          openCardId: null,
-          openSlotIndex: null,
-        },
+        rewardSelection: rewardId,
       })),
 
-    skipEventSelection: () => {
-      const { eventState } = get()
-
-      if (eventState.resolved || eventState.skipped) {
+    claimReward: () => {
+      const state = get()
+      if (!state.rewardPending || !state.rewardSelection) {
         return
       }
 
+      const reward = state.rewardPending.options.find((entry) => entry.id === state.rewardSelection)
+      if (!reward) {
+        return
+      }
+
+      const nextState = applyRewardEffect(
+        {
+          ...state,
+          credits: state.credits + state.rewardPending.credits,
+          rewardPending: null,
+          rewardSelection: null,
+        },
+        reward,
+      )
+
+      set({
+        ...nextState,
+        currentEventCardId: drawCurrentEvent(nextState),
+        currentEventResolved: false,
+        currentEventChoiceId: null,
+        lastEventResult: null,
+        selectedStrategyId: null,
+      })
+    },
+
+    toggleShop: () =>
       set((state) => ({
         ...state,
-        eventState: {
-          ...state.eventState,
-          resolved: true,
-          skipped: true,
-          usedCardId: null,
-          usedSlotIndex: null,
-          openCardId: null,
-          openSlotIndex: null,
-        },
+        shopOpen: !state.shopOpen,
+      })),
+
+    acknowledgeBlackSwan: () =>
+      set((state) => ({
+        ...state,
+        blackSwanSeen: true,
+      })),
+
+    buyShopItem: (shopId) => {
+      const state = get()
+      const item = CREDIT_SHOP.find((entry) => entry.id === shopId)
+      if (!item) {
+        return
+      }
+
+      const price = getCreditShopPrice(item.baseCost, state.floor)
+      if (state.credits < price || state.shopPurchasesThisFloor.includes(shopId)) {
+        return
+      }
+
+      const activeEffects = [...state.activeEffects]
+      if (item.effect.noWaste) {
+        activeEffects.push({ id: `nowaste-${Date.now()}`, type: 'noWaste', value: 1, turnsLeft: 1 })
+      }
+      if (item.effect.rivalFreeze) {
+        activeEffects.push({ id: `freeze-${Date.now()}`, type: 'rivalFreeze', value: 1, turnsLeft: 1 })
+      }
+      if (item.effect.preview) {
+        activeEffects.push({ id: `preview-${Date.now()}`, type: 'preview', value: 1, turnsLeft: 1 })
+      }
+
+      set((current) => ({
+        ...current,
+        credits: current.credits - price,
+        companyHealth: applyHealth(current.companyHealth, item.effect.companyHealth ?? 0, current.maxHealth),
+        currentEventCardId:
+          item.effect.rerollEvent && !current.currentEventResolved
+            ? drawCurrentEvent(current)
+            : current.currentEventCardId,
+        activeEffects,
+        shopPurchasesThisFloor: [...current.shopPurchasesThisFloor, shopId],
       }))
-
-      enqueueToast('문서 검토를 건너뛰고 이번 달 마감을 준비합니다.', 'warning')
     },
 
-    resolveEventChoice: (cardId, slotIndex, choiceId) => {
-      let toast = null
+    advanceFloor: () => {
+      const state = get()
+      if (state.gameStatus !== 'playing' || !state.selectedStrategyId || !state.currentEventResolved) {
+        return
+      }
 
-      set((state) => {
-        if (state.eventState.resolved || state.eventState.skipped) {
-          return state
-        }
+      const plan = composeTurnPlan(state, state.selectedStrategyId)
+      if (!plan) {
+        return
+      }
 
-        if (!state.eventState.offeredIds.includes(cardId)) {
-          return state
-        }
-
-        const card = getEventCardById(cardId)
-        const choice = card?.choices.find((entry) => entry.id === choiceId)
-
-        if (!card || !choice) {
-          return state
-        }
-
-        const isSuccess = Math.random() <= choice.successRate
-        const resultText = isSuccess ? choice.successText : choice.failureText
-        const effectBundle = isSuccess ? choice.successEffects : choice.failureEffects
-        const nextState = recalculateState(applyEffects(state, effectBundle))
-
-        toast = createToast(`${card.name} · ${resultText}`, isSuccess ? 'positive' : 'negative')
-
-        return {
-          ...nextState,
-          history: pushHistoryEntry(state.history, {
-            type: 'event',
-            month: state.month,
-            cardId,
-            choiceId,
-            outcome: isSuccess ? 'success' : 'failure',
-            message: resultText,
-          }),
-          toasts: [...state.toasts, toast].slice(-4),
-          eventState: {
-            ...nextState.eventState,
-            offeredIds: state.eventState.offeredIds,
-            resolved: true,
-            skipped: false,
-            usedCardId: cardId,
-            usedSlotIndex: slotIndex,
-            openCardId: null,
-            openSlotIndex: null,
-          },
-        }
+      const momentumEffect = getMomentumEffect(state.momentum)
+      const demand = calcDemand({
+        category: state.itemCategory,
+        econPhase: state.econPhase,
+        industryTier: state.industryTier,
+        momentumMul: 1 + momentumEffect.demandMul,
+        blackSwanMul: state.activeBlackSwan?.demandMul ?? 1,
+        eventMul: 1 + getEffectValue(state, 'demandMul'),
       })
 
-      if (toast) {
-        setTimeout(() => dismissToast(toast.id), 2000)
+      const playerAttraction = calcAttraction({
+        quality: plan.quality,
+        brand: state.brandValue,
+        sellPrice: plan.sellPrice,
+        resistance: state.priceResistance,
+        category: state.itemCategory,
+        econPhase: state.econPhase,
+        awarenessBonus: plan.awareness,
+      })
+
+      const shareData = calcRivalShares({
+        playerAttraction,
+        itemCategory: state.itemCategory,
+        econPhase: state.econPhase,
+        rivals: state.rivals,
+      })
+
+      let result = calcSettlement({
+        sellPrice: plan.sellPrice,
+        orderQty: plan.orderQty,
+        demand,
+        myShare: shareData.myShare,
+        vendorUnitCost: plan.vendorUnitCost,
+        qualityMode: plan.qualityMode,
+        factoryActive: state.factory.built,
+        monthlyInterest: Math.round((state.debt * (state.interestRate + (state.activeBlackSwan?.rateAdd ?? 0))) / 12),
+        monthlyRent: state.realty === 'monthly' ? 1000000 : 0,
+        safetyCost: state.factory.built && state.factory.safetyOn ? 5000000 : 0,
+        otherFixed: state.monthlyFixedCost,
+      })
+
+      let salvageValue = 0
+      if (hasEffect(state, 'noWaste')) {
+        salvageValue = result.wasteCost
+        result = {
+          ...result,
+          netProfit: result.netProfit + salvageValue,
+        }
       }
-    },
 
-    advanceMonth: () => {
-      const current = get()
+      const advisorFee = getAdvisorFee(state.advisor, result.netProfit)
+      const netProfit = result.netProfit - advisorFee
+      const momentumState = updateMomentum(state.momentumHistory, netProfit)
+      let companyHealth = applyHealth(
+        state.companyHealth,
+        calcHealthDelta({
+          netProfit,
+          waste: result.waste,
+          orderQty: plan.orderQty,
+          blackSwanPenalty: state.activeBlackSwan ? 2 : 0,
+          eventPenalty: state.lastEventResult?.effects?.healthDelta && state.lastEventResult.effects.healthDelta < 0 ? 1 : 0,
+          profitableStreak: momentumState.profitableStreak,
+        }),
+        state.maxHealth,
+      )
 
-      if (!current.eventState.resolved && !current.eventState.skipped) {
-        return
-      }
+      let nextRivals = updateRivalsFromSettlement({
+        rivals: state.rivals,
+        demand,
+        rivalShares: shareData.rivalShares,
+        playerPrice: plan.sellPrice,
+      })
+      nextRivals = applyShareDamage(nextRivals, shareData.myShare)
 
-      if (!current.selectedVendor || current.price <= 0 || current.orderQty <= 0) {
-        enqueueToast('벤더, 판매가, 발주량을 먼저 설정해야 합니다.', 'warning')
-        return
-      }
-
-      let toast = null
-
-      set((state) => {
-        const sharePreview = deriveSharePreview(state)
-        const myShare = sharePreview.playerShare
-        const demand = calcDemand({
-          category: state.itemCategory,
-          econPhase: state.economyPhase,
-          industryTier: state.industryTier,
-          blackSwanMul: getBlackSwanDemandMultiplier(state),
-          eventMul: getEventDemandMultiplier(state),
-        })
-
-        const previousFloor = state.floor
-        const previousEconPhase = state.economyPhase
-        const result = calcSettlement({
-          sellPrice: state.price,
-          orderQty: state.orderQty,
-          demand,
-          myShare,
-          vendorUnitCost: getAdjustedVendorUnitCost(state),
-          qualityMode: state.qualityMode,
-          factoryActive: getFactoryActive(state),
-          monthlyInterest: getMonthlyInterest(state),
-          monthlyRent: getMonthlyRent(state),
-          safetyCost: getSafetyCost(state),
-          otherFixed: state.monthlyFixedCost,
-          opCostMultiplier: 1.0,
-          shutdownLeft: state._shutdownLeft ?? 0,
-        })
-
-        const playerSharePct = roundTo(myShare * 100, 1)
-        const nextPhase = advanceEconPhase(previousEconPhase, state._metaBoomBonus ?? 0)
-        const nextCapital = state.capital - result.prepayment + result.revenue - result.fixedTotal
-        const nextProfitHistory = [...state.profitHistory, result.netProfit].slice(-12)
-        const nextBrandValue = roundTo(
-          clamp(
-            state.brandValue +
-              (result.netProfit >= 0 ? 1.2 : -0.9) +
-              (result.waste === 0 ? 0.6 : -0.7),
-            0,
-            160,
-          ),
-          1,
-        )
-        const nextQualityScore = roundTo(
-          clamp(
-            state.qualityScore +
-              (state.qualityMode === 'premium' ? 0.8 : state.qualityMode === 'budget' ? -0.3 : 0.3) +
-              (result.waste > 0 ? -0.1 : 0.4),
-            0,
-            160,
-          ),
-          1,
-        )
-        const nextRivals = settleRivalsAfterMonth(state, demand, sharePreview)
-
-        const baseNextState = {
-          ...state,
-          floor: previousFloor + 1,
-          month: state.month + 1,
-          economyPhase: nextPhase,
-          previousEconPhase,
-          capital: nextCapital,
-          marketShare: playerSharePct,
-          brandValue: nextBrandValue,
-          qualityScore: nextQualityScore,
-          orderQty: 0,
-          profitHistory: nextProfitHistory,
-          cumulativeProfit: state.cumulativeProfit + result.netProfit,
+      let activeEconomicWar = state.activeEconomicWar
+      if (!state.activeBlackSwan && activeEconomicWar) {
+        const warOutcome = applyRivalHealthDamage({
           rivals: nextRivals,
-          settlementModalOpen: true,
-          lastSettlement: {
-            ...result,
-            demand,
-            myShare,
-            orderQty: state.orderQty,
-            floor: previousFloor,
-            previousEconPhase,
-            nextEconPhase: nextPhase,
-          },
-          lastTurnReport: {
-            month: state.month,
-            revenue: result.revenue,
-            operatingProfit: result.netProfit,
-            unitsSold: result.actualSold,
-            shareChange: roundTo(playerSharePct - state.marketShare, 1),
-          },
-          history: pushHistoryEntry(state.history, {
-            type: 'month',
-            month: state.month,
-            revenue: result.revenue,
-            operatingProfit: result.netProfit,
-            unitsSold: result.actualSold,
-            shareChange: roundTo(playerSharePct - state.marketShare, 1),
-          }),
+          myShare: shareData.myShare,
+          myProfit: netProfit,
+          companyHealth,
+          activeWar: activeEconomicWar,
+        })
+        nextRivals = warOutcome.rivals
+        companyHealth = warOutcome.companyHealth
+        if (activeEconomicWar.floorsLeft !== 999) {
+          activeEconomicWar = {
+            ...activeEconomicWar,
+            floorsLeft: Math.max(0, activeEconomicWar.floorsLeft - 1),
+          }
         }
-
-        const nextEventState = createFreshEventState(baseNextState)
-        const nextState = recalculateState(
-          {
-            ...baseNextState,
-            eventState: nextEventState,
-          },
-          { preserveEvents: true },
-        )
-
-        toast = createToast(
-          `${previousFloor}층 정산 완료 · 순이익 ${
-            result.netProfit >= 0 ? '+' : ''
-          }${result.netProfit.toLocaleString()}원`,
-          result.netProfit >= 0 ? 'positive' : 'negative',
-        )
-
-        return {
-          ...nextState,
-          toasts: [...state.toasts, toast].slice(-4),
+        if (activeEconomicWar.floorsLeft === 0) {
+          activeEconomicWar = null
         }
+      }
+
+      const nextCapital =
+        state.capital - result.prepayment + result.revenue - result.fixedTotal - advisorFee + salvageValue
+      const nextFloor = state.floor + 1
+      const nextEconPhase =
+        state.activeBlackSwan?.econLocked ?? advanceEconPhase(state.econPhase, state.meta.boomBonus ?? 0)
+      const settlement = {
+        ...result,
+        netProfit,
+        advisorFee,
+        salvageValue,
+        floor: state.floor,
+        demand,
+        myShare: shareData.myShare,
+        orderQty: plan.orderQty,
+        sellPrice: plan.sellPrice,
+        plan,
+        econFrom: state.econPhase,
+        econTo: nextEconPhase,
+        healthBefore: state.companyHealth,
+        healthAfter: companyHealth,
+        momentum: momentumState.momentum,
+        momentumHistory: momentumState.momentumHistory,
+        educationHint: getEducationHint({
+          strategyId: state.selectedStrategyId,
+          econPhase: state.econPhase,
+          itemCategory: state.itemCategory,
+          waste: result.waste,
+          orderQty: plan.orderQty,
+          netProfit,
+        }),
+      }
+
+      let activeBlackSwan = state.activeBlackSwan
+      let blackSwanSeen = state.blackSwanSeen
+      if (activeBlackSwan) {
+        activeBlackSwan = {
+          ...activeBlackSwan,
+          floorsLeft: activeBlackSwan.floorsLeft - 1,
+        }
+        if (activeBlackSwan.floorsLeft <= 0) {
+          activeBlackSwan = null
+          blackSwanSeen = false
+        }
+      } else {
+        activeBlackSwan = maybeTriggerBlackSwan({ ...state, floor: nextFloor })
+        if (activeBlackSwan) {
+          blackSwanSeen = false
+        }
+      }
+
+      const draftState = {
+        ...state,
+        floor: nextFloor,
+        econPhase: nextEconPhase,
+        capital: nextCapital,
+        companyHealth,
+        momentum: momentumState.momentum,
+        momentumHistory: momentumState.momentumHistory,
+        rivals: ensureRivalsJoined(nextRivals, nextFloor, state.industryTier),
+        activeEconomicWar: activeEconomicWar ?? maybeStartEconomicWar({ ...state, floor: nextFloor, rivals: nextRivals }),
+        activeBlackSwan,
+        blackSwanSeen,
+        activeEffects: nextEffectList(state.activeEffects),
+      }
+
+      const rewardPending = createRewardDraft({
+        floor: state.floor,
+        momentum: momentumState.momentum,
       })
 
-      if (toast) {
-        setTimeout(() => dismissToast(toast.id), 2000)
+      let gameStatus = 'playing'
+      if (companyHealth <= 0 || nextCapital - state.debt < -30000000) {
+        gameStatus = activeBlackSwan?.id === 'acquisition' ? 'hostile' : 'bankrupt'
+      } else if (state.floor >= state.maxFloors && (!state.activeEconomicWar || netProfit >= 0)) {
+        gameStatus = 'clear'
       }
+
+      const legacyCards =
+        gameStatus === 'playing' ? state.legacyCards : resolveLegacyCards(draftState, gameStatus)
+      const meta =
+        gameStatus === 'playing'
+          ? state.meta
+          : recordGameEnd(gameStatus, {
+              ...state.meta,
+              advisorUsed: Array.from(new Set([...(state.meta.advisorUsed ?? []), state.advisor])),
+              analystPlays:
+                state.meta.analystPlays + (state.advisor === 'analyst' ? 1 : 0),
+              floor50Reached:
+                state.floor >= 50 ? state.meta.floor50Reached + 1 : state.meta.floor50Reached,
+              floor80Reached:
+                state.floor >= 80 ? state.meta.floor80Reached + 1 : state.meta.floor80Reached,
+              economicWarWins:
+                state.warWinCount + (activeEconomicWar === null && state.activeEconomicWar ? 1 : 0),
+            })
+
+      set({
+        ...draftState,
+        gameStatus,
+        legacyCards,
+        meta,
+        advisorFeeTotal: state.advisorFeeTotal + advisorFee,
+        settlementModalOpen: gameStatus === 'playing',
+        lastSettlement: settlement,
+        rewardPending: gameStatus === 'playing' ? rewardPending : null,
+        rewardSelection: null,
+        currentEventCardId: null,
+        currentEventResolved: false,
+        currentEventChoiceId: null,
+        lastEventResult: null,
+        selectedStrategyId: null,
+        shopPurchasesThisFloor: [],
+        previewOpen: false,
+        floorPhase:
+          draftState.activeBlackSwan || activeBlackSwan
+            ? 'black-swan'
+            : draftState.activeEconomicWar
+              ? 'economic-war'
+              : 'normal',
+        profitHistory: [...state.profitHistory, netProfit].slice(-12),
+        cumulativeProfit: state.cumulativeProfit + netProfit,
+        peakMarketShare: Math.max(state.peakMarketShare, shareData.myShare),
+        decisionLog: [
+          {
+            floor: state.floor,
+            strategyId: state.selectedStrategyId,
+            netProfit,
+            educationHint: settlement.educationHint,
+          },
+          ...state.decisionLog,
+        ].slice(0, 12),
+      })
+
+      enqueueToast(
+        `${state.floor}층 정산 완료 · ${netProfit >= 0 ? '+' : ''}${Math.round(netProfit).toLocaleString()}원`,
+        netProfit >= 0 ? 'positive' : 'negative',
+      )
     },
   }
 })

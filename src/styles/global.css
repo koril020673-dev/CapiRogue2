@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --cr2-bg: #0f0f14;
+  --cr2-s1: #17171f;
+  --cr2-s2: #1e1e28;
+  --cr2-s3: #262633;
+  --cr2-border: rgba(255, 255, 255, 0.08);
+  --cr2-accent: #f0a500;
+  --cr2-positive: #4ade80;
+  --cr2-negative: #ff6b6b;
+  --cr2-warning: #facc15;
+  --cr2-neutral: #94a3b8;
+  --cr2-text: #f0ede8;
+  --cr2-dim: #6b7280;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--cr2-text);
+  background: var(--cr2-bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(167, 139, 250, 0.12), transparent 28%),
+    radial-gradient(circle at top right, rgba(240, 165, 0, 0.1), transparent 26%),
+    var(--cr2-bg);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}

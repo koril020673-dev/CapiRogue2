@@ -1,0 +1,21 @@
+.cr2-econ-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)), var(--cr2-s1);
+}
+
+.cr2-econ-banner__icon {
+  font-size: 1.4rem;
+}
+
+.cr2-econ-banner__label {
+  font-weight: 700;
+}
+
+.cr2-econ-banner__copy {
+  color: var(--cr2-neutral);
+}

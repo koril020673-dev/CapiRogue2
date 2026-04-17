@@ -1,0 +1,77 @@
+.cr2-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--cr2-s2);
+  border-bottom: 1px solid var(--cr2-border);
+}
+
+.cr2-statusbar__block,
+.cr2-statusbar__shop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cr2-statusbar__label {
+  color: var(--cr2-dim);
+  font-size: 0.8rem;
+}
+
+.cr2-statusbar__health,
+.cr2-statusbar__momentum {
+  display: flex;
+  gap: 4px;
+}
+
+.cr2-statusbar__pip {
+  width: 14px;
+  height: 10px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cr2-statusbar__pip[data-filled='true'] {
+  background: var(--cr2-positive);
+}
+
+.cr2-statusbar[data-health-critical='true'] .cr2-statusbar__pip[data-filled='true'] {
+  background: var(--cr2-negative);
+  animation: cr2-health-pulse 0.8s infinite;
+}
+
+.cr2-statusbar__momentum span[data-dir='up'] {
+  color: var(--cr2-positive);
+}
+
+.cr2-statusbar__momentum span[data-dir='down'] {
+  color: var(--cr2-negative);
+}
+
+.cr2-statusbar__divider {
+  width: 1px;
+  height: 24px;
+  background: var(--cr2-border);
+}
+
+.cr2-statusbar__shop {
+  margin-left: auto;
+  padding: 10px 14px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cr2-text);
+  cursor: pointer;
+}
+
+@keyframes cr2-health-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}

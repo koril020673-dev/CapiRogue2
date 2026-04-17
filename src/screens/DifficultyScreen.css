@@ -1,0 +1,5 @@
+.cr2-difficulty-screen__confirm[disabled],
+.cr2-advisor-screen__confirm[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

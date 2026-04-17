@@ -1,0 +1,18 @@
+.cr2-advisor-bubble {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--cr2-advisor-color) 45%, var(--cr2-border));
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--cr2-advisor-color) 8%, var(--cr2-s1));
+}
+
+.cr2-advisor-bubble__icon {
+  font-size: 1.6rem;
+}
+
+.cr2-advisor-bubble p {
+  color: var(--cr2-neutral);
+  line-height: 1.6;
+}

@@ -1,0 +1,72 @@
+.cr2-advisor-screen,
+.cr2-difficulty-screen,
+.cr2-gameover-screen {
+  min-height: 100vh;
+  display: grid;
+  gap: 24px;
+  padding: 40px 24px;
+  align-content: center;
+}
+
+.cr2-advisor-screen__head,
+.cr2-difficulty-screen__head {
+  display: grid;
+  gap: 8px;
+  text-align: center;
+}
+
+.cr2-advisor-screen__eyebrow,
+.cr2-difficulty-screen__eyebrow {
+  color: var(--cr2-dim);
+  font-size: 0.85rem;
+}
+
+.cr2-advisor-screen__grid,
+.cr2-difficulty-screen__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.cr2-advisor-screen__card,
+.cr2-difficulty-screen__card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 22px;
+  background: var(--cr2-s1);
+  color: var(--cr2-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cr2-advisor-screen__card[data-locked='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cr2-advisor-screen__card[data-selected='true'],
+.cr2-difficulty-screen__card[data-selected='true'] {
+  border-color: var(--cr2-accent);
+  box-shadow: 0 0 0 1px var(--cr2-accent);
+}
+
+.cr2-advisor-screen__card span,
+.cr2-advisor-screen__card small,
+.cr2-difficulty-screen__card span,
+.cr2-difficulty-screen__card small {
+  color: var(--cr2-neutral);
+}
+
+.cr2-advisor-screen__confirm,
+.cr2-difficulty-screen__confirm {
+  justify-self: center;
+  min-width: 220px;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--cr2-accent);
+  color: var(--cr2-bg);
+  cursor: pointer;
+}

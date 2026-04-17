@@ -1,7 +1,6 @@
 const QUALITY_MUL = {
   budget: 0.8,
-  standard: 1.0,
-  balanced: 1.0,
+  standard: 1,
   premium: 1.5,
 }
 
@@ -19,11 +18,11 @@ export function calcSettlement({
   monthlyRent,
   safetyCost,
   otherFixed,
-  opCostMultiplier = 1.0,
+  opCostMultiplier = 1,
   shutdownLeft = 0,
 }) {
-  const qualityMul = QUALITY_MUL[qualityMode] ?? 1.0
-  const discount = factoryActive ? FACTORY_DISCOUNT : 1.0
+  const qualityMul = QUALITY_MUL[qualityMode] ?? 1
+  const discount = factoryActive ? FACTORY_DISCOUNT : 1
   const unitCost = Math.round(vendorUnitCost * qualityMul * discount)
   const prepayment = unitCost * orderQty
 
@@ -50,10 +49,7 @@ export function calcSettlement({
     summary: {
       sold: `${actualSold}개 판매 / 발주 ${orderQty}개 / 수요 ${demand}개`,
       waste: waste > 0 ? `폐기 ${waste}개 (-${wasteCost.toLocaleString()}원)` : null,
-      profit:
-        netProfit >= 0
-          ? `+${netProfit.toLocaleString()}원`
-          : `${netProfit.toLocaleString()}원`,
+      profit: netProfit >= 0 ? `+${netProfit.toLocaleString()}원` : `${netProfit.toLocaleString()}원`,
     },
   }
 }

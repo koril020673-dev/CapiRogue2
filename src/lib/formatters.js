@@ -7,3 +7,7 @@ export function formatSignedCurrency(value) {
   const sign = rounded > 0 ? '+' : ''
   return `${sign}${rounded.toLocaleString()}원`
 }
+
+export function formatPercent(value, digits = 1) {
+  return `${(Number(value ?? 0) * 100).toFixed(digits)}%`
+}

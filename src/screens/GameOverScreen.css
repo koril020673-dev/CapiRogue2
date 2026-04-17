@@ -1,0 +1,44 @@
+.cr2-gameover-screen__hero {
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 28px;
+  background: var(--cr2-s1);
+  text-align: center;
+}
+
+.cr2-gameover-screen__timeline {
+  display: grid;
+  gap: 12px;
+}
+
+.cr2-gameover-screen__item {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 18px;
+  background: var(--cr2-s1);
+}
+
+.cr2-gameover-screen__item span,
+.cr2-gameover-screen__item small,
+.cr2-gameover-screen__hero p {
+  color: var(--cr2-neutral);
+}
+
+.cr2-gameover-screen__actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.cr2-gameover-screen__actions button {
+  padding: 14px 18px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 16px;
+  background: var(--cr2-s1);
+  color: var(--cr2-text);
+  cursor: pointer;
+}

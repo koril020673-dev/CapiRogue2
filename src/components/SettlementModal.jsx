@@ -1,96 +1,74 @@
 import './SettlementModal.css'
-import { formatCurrency, formatSignedCurrency } from '../lib/formatters.js'
+import { ECO_DISPLAY } from '../constants/economy.js'
 import { useGameStore } from '../store/useGameStore.js'
 
-const ECONOMY_LABELS = {
-  boom: '호황',
-  stable: '평시',
-  recession: '불황',
+function fmt(value) {
+  return Math.round(value ?? 0).toLocaleString()
 }
 
 export function SettlementModal() {
-  const settlementModalOpen = useGameStore((state) => state.settlementModalOpen)
-  const lastSettlement = useGameStore((state) => state.lastSettlement)
+  const open = useGameStore((state) => state.settlementModalOpen)
+  const settlement = useGameStore((state) => state.lastSettlement)
   const closeSettlementModal = useGameStore((state) => state.closeSettlementModal)
 
-  if (!settlementModalOpen || !lastSettlement) {
+  if (!open || !settlement) {
     return null
   }
 
-  const previousPhase = ECONOMY_LABELS[lastSettlement.previousEconPhase] ?? '평시'
-  const nextPhase = ECONOMY_LABELS[lastSettlement.nextEconPhase] ?? '평시'
-  const profitClass =
-    lastSettlement.netProfit >= 0
-      ? 'cr2-settlement-modal__profit--positive'
-      : 'cr2-settlement-modal__profit--negative'
-
   return (
-    <div
-      className="cr2-settlement-modal__backdrop"
-      role="presentation"
-      onClick={closeSettlementModal}
-    >
-      <div
-        className="cr2-settlement-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="cr2-settlement-modal-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="cr2-settlement-modal__top">
+    <div className="cr2-settlement-overlay">
+      <div className="cr2-settlement-modal">
+        <div className="cr2-settlement-modal__head">
           <div>
-            <h2 id="cr2-settlement-modal-title">{`Floor ${lastSettlement.floor} 완료`}</h2>
+            <p className="cr2-settlement-modal__eyebrow">Settlement</p>
+            <h2>Floor {settlement.floor} 완료</h2>
           </div>
-          <button
-            type="button"
-            className="cr2-settlement-modal__close"
-            onClick={closeSettlementModal}
-            aria-label="정산 모달 닫기"
-          >
+          <button type="button" className="cr2-settlement-modal__close" onClick={closeSettlementModal}>
             ✕
           </button>
         </div>
 
-        <div className="cr2-settlement-modal__summary-grid">
+        <div className="cr2-settlement-modal__grid">
           <article>
             <span>매출</span>
-            <strong>{formatCurrency(lastSettlement.revenue)}</strong>
+            <strong>{fmt(settlement.revenue)}원</strong>
           </article>
           <article>
-            <span>원가</span>
-            <strong>{formatCurrency(lastSettlement.prepayment)}</strong>
+            <span>선결제</span>
+            <strong>{fmt(settlement.prepayment)}원</strong>
           </article>
           <article>
-            <span>고정비</span>
-            <strong>{formatCurrency(lastSettlement.fixedTotal)}</strong>
+            <span>고정비 + 수수료</span>
+            <strong>{fmt(settlement.fixedTotal + settlement.advisorFee)}원</strong>
           </article>
         </div>
 
-        <div className="cr2-settlement-modal__profit-block">
-          <span>이번 달 순이익</span>
-          <strong className={profitClass}>{formatSignedCurrency(lastSettlement.netProfit)}</strong>
+        <div className="cr2-settlement-modal__profit" data-negative={settlement.netProfit < 0}>
+          {settlement.netProfit >= 0 ? '+' : ''}
+          {fmt(settlement.netProfit)}원
         </div>
 
-        <div className="cr2-settlement-modal__detail-list">
-          <p>
-            판매: {lastSettlement.actualSold}개 / 발주: {lastSettlement.orderQty}개 / 수요:{' '}
-            {lastSettlement.demand}개
-          </p>
-          {lastSettlement.waste > 0 ? (
-            <p className="cr2-settlement-modal__warning">
-              {`⚠ 폐기 ${lastSettlement.waste}개 (-${lastSettlement.wasteCost.toLocaleString()}원)`}
-            </p>
-          ) : null}
-          <p>{`점유율: ${(lastSettlement.myShare * 100).toFixed(1)}%`}</p>
-          <p>{`경기: ${previousPhase} → ${nextPhase}`}</p>
+        <div className="cr2-settlement-modal__details">
+          <span>
+            판매 {settlement.actualSold}개 / 발주 {settlement.orderQty}개 / 수요 {settlement.demand}개
+          </span>
+          {settlement.waste > 0 && (
+            <span className="cr2-settlement-modal__waste">
+              폐기 {settlement.waste}개 (-{fmt(settlement.wasteCost)}원)
+            </span>
+          )}
+          <span>점유율 {(settlement.myShare * 100).toFixed(1)}%</span>
+          <span>
+            경기 {ECO_DISPLAY[settlement.econFrom].label} → {ECO_DISPLAY[settlement.econTo].label}
+          </span>
+          <span>
+            체력 {settlement.healthBefore} → {settlement.healthAfter}
+          </span>
+          {settlement.educationHint && <span>💡 {settlement.educationHint}</span>}
         </div>
 
-        <button
-          type="button"
-          className="cr2-settlement-modal__confirm"
-          onClick={closeSettlementModal}
-        >
-          다음 층으로
+        <button type="button" className="cr2-settlement-modal__next" onClick={closeSettlementModal}>
+          결과 확인
         </button>
       </div>
     </div>
