@@ -24,7 +24,9 @@ export function FloorMap() {
           />
         ))}
       </div>
-      <span className="cr2-floormap__counter">{floor} / 120층</span>
+      <span className="cr2-floormap__counter">
+        {floor} / {maxFloors}층
+      </span>
     </div>
   )
 }

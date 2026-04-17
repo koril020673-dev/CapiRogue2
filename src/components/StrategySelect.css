@@ -1,20 +1,27 @@
-.cr2-strategy {
+.cr2-strategy-select {
   display: grid;
-  gap: 16px;
-}
-
-.cr2-strategy__eyebrow {
-  color: var(--cr2-dim);
-  font-size: 0.8rem;
-}
-
-.cr2-strategy__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
-.cr2-strategy__card {
+.cr2-strategy-select__head {
+  display: grid;
+  gap: 6px;
+}
+
+.cr2-strategy-select__eyebrow {
+  color: var(--cr2-dim);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.cr2-strategy-select__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cr2-strategy-select__card {
   display: grid;
   gap: 8px;
   padding: 18px;
@@ -24,14 +31,30 @@
   color: var(--cr2-text);
   text-align: left;
   cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    opacity 0.18s ease,
+    background 0.18s ease;
 }
 
-.cr2-strategy__card small,
-.cr2-strategy__card span {
+.cr2-strategy-select__card:hover {
+  transform: translateY(-2px);
+}
+
+.cr2-strategy-select__card[data-selected='true'] {
+  background: color-mix(in srgb, var(--cr2-s1) 78%, white);
+}
+
+.cr2-strategy-select__card[data-selected='false'] {
+  opacity: 0.9;
+}
+
+.cr2-strategy-select__card small {
   color: var(--cr2-neutral);
 }
 
-.cr2-strategy__card[data-selected='true'] {
-  border-color: var(--cr2-accent);
-  box-shadow: 0 0 0 1px var(--cr2-accent);
+@media (max-width: 760px) {
+  .cr2-strategy-select__grid {
+    grid-template-columns: 1fr;
+  }
 }

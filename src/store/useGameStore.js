@@ -1,11 +1,10 @@
 import { create } from 'zustand'
 import { ADVISORS } from '../constants/advisors.js'
 import { BLACK_SWANS } from '../constants/blackSwans.js'
-import { DIFFICULTIES } from '../constants/difficulties.js'
+import { drawWeightedEventCards, getEventCardById } from '../constants/docEvents.js'
 import { ECO_DISPLAY, ECO_WEIGHTS } from '../constants/economy.js'
 import { ECONOMIC_WARS } from '../constants/economicWars.js'
 import { getEducationHint } from '../constants/educationHints.js'
-import { drawWeightedEventCards, getEventCardById } from '../constants/eventCards.js'
 import { LEGACY_CONDITIONS } from '../constants/legacy.js'
 import { CREDIT_SHOP } from '../constants/rewards.js'
 import {
@@ -14,7 +13,12 @@ import {
   RIVAL_ORDER,
   createInitialRivals,
 } from '../constants/rivals.js'
-import { STRATEGIES, VENDOR, VENDOR_MODE_MUL } from '../constants/strategies.js'
+import {
+  ORDER_TIERS,
+  STRATEGIES,
+  VENDOR,
+  VENDOR_MODE_MUL,
+} from '../constants/strategies.js'
 import { clamp, roundTo } from '../lib/gameMath.js'
 import { getCreditShopPrice } from '../logic/creditEngine.js'
 import { calcDemand } from '../logic/demandEngine.js'
@@ -36,15 +40,76 @@ import {
   ensureRivalsJoined,
   updateRivalsFromSettlement,
 } from '../logic/rivalEngine.js'
+import {
+  appendRunHistory,
+  clearSaveSlot,
+  hasSaveSlot,
+  loadRunHistory,
+  loadSaveSlot,
+  loadSettings,
+  saveSaveSlot,
+  saveSettings,
+} from '../logic/saveEngine.js'
 import { calcSettlement } from '../logic/settlementEngine.js'
 
 const MAX_HEALTH = 10
+const FIXED_DIFFICULTY = {
+  capital: 30000000,
+  debt: 0,
+  interestRate: 0.072,
+}
 
 function createToast(message, tone = 'neutral') {
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     message,
     tone,
+  }
+}
+
+function getWarningAlerts(state) {
+  const alerts = []
+  const fixedCostProxy = Math.max(
+    1,
+    state.monthlyFixedCost +
+      (state.realty === 'monthly' ? 1000000 : 0) +
+      (state.factory.built && state.factory.safetyOn ? 5000000 : 0),
+  )
+  const recentLosses = state.profitHistory.slice(-3)
+  const hasThreeStraightLosses =
+    recentLosses.length === 3 && recentLosses.every((profit) => profit < 0)
+
+  if (state.capital < fixedCostProxy * 2) {
+    alerts.push('⚠ 현금 부족 경고')
+  }
+
+  if (hasThreeStraightLosses) {
+    alerts.push('⚠ 3연속 적자')
+  }
+
+  if (state.companyHealth <= 3) {
+    alerts.push('🔴 위기')
+  }
+
+  return alerts
+}
+
+function getAdvisorFee(advisorId, netProfit) {
+  const advisor = ADVISORS[advisorId]
+  if (!advisor?.fee) {
+    return 0
+  }
+
+  switch (advisor.fee.type) {
+    case 'percent':
+      if (netProfit > 0) {
+        return Math.round(netProfit * advisor.fee.value)
+      }
+      return advisor.fee.lossFixed ?? 0
+    case 'fixed':
+      return advisor.fee.value
+    default:
+      return 0
   }
 }
 
@@ -119,39 +184,23 @@ function applyLegacyBonuses(baseState, legacyCards) {
   }
 }
 
-function getAdvisorFee(advisorId, netProfit) {
-  const advisor = ADVISORS[advisorId]
-  if (!advisor?.fee) {
-    return 0
-  }
-
-  if (advisor.fee.type === 'percent') {
-    if (netProfit > 0) {
-      return Math.round(netProfit * advisor.fee.value)
-    }
-    return advisor.fee.lossFixed ?? 0
-  }
-
-  if (advisor.fee.type === 'fixed') {
-    return advisor.fee.value
-  }
-
-  return 0
-}
-
 function createBaseState() {
   const meta = loadMeta()
   const legacyCards = loadLegacyCards()
+  const settings = loadSettings()
+  const playHistory = loadRunHistory()
+  const saveExists = hasSaveSlot()
 
   return {
+    screen: 'title',
     floor: 1,
     maxFloors: 120,
     gameStatus: 'idle',
     floorPhase: 'normal',
     advisor: null,
     advisorDraft: null,
-    difficulty: null,
-    difficultyDraft: null,
+    difficulty: 'fixed',
+    difficultyDraft: 'fixed',
     companyHealth: 10,
     maxHealth: MAX_HEALTH,
     momentum: 0,
@@ -160,9 +209,9 @@ function createBaseState() {
     econPhase: 'stable',
     industryTier: 1,
     itemCategory: 'normal',
-    capital: 0,
-    debt: 0,
-    interestRate: 0,
+    capital: FIXED_DIFFICULTY.capital,
+    debt: FIXED_DIFFICULTY.debt,
+    interestRate: FIXED_DIFFICULTY.interestRate,
     monthlyFixedCost: 500000,
     realty: 'monthly',
     brandValue: 0,
@@ -183,10 +232,14 @@ function createBaseState() {
     activeEffects: [],
     lastSettlement: null,
     settlementModalOpen: false,
+    shopScreenOpen: false,
     profitHistory: [],
     cumulativeProfit: 0,
     legacyCards,
     meta,
+    playHistory,
+    settings,
+    saveExists,
     advisorFeeTotal: 0,
     warWinCount: 0,
     currentEventCardId: null,
@@ -194,10 +247,13 @@ function createBaseState() {
     currentEventChoiceId: null,
     lastEventResult: null,
     selectedStrategyId: null,
+    selectedOrderTier: null,
     rewardPending: null,
     rewardSelection: null,
+    rewardClaimed: false,
     shopOpen: false,
     shopPurchasesThisFloor: [],
+    warningAlerts: [],
     toasts: [],
     decisionLog: [],
     peakMarketShare: 0,
@@ -206,19 +262,19 @@ function createBaseState() {
   }
 }
 
-function createRunState({ advisor, difficulty, meta, legacyCards }) {
-  const difficultyDef = DIFFICULTIES[difficulty]
+function createRunState({ advisor, meta, legacyCards, settings, playHistory, saveExists }) {
   const base = applyLegacyBonuses(
     {
       ...createBaseState(),
+      screen: 'game',
       advisor,
       advisorDraft: advisor,
-      difficulty,
-      difficultyDraft: difficulty,
+      difficulty: 'fixed',
+      difficultyDraft: 'fixed',
       gameStatus: 'playing',
-      capital: difficultyDef.capital,
-      debt: difficultyDef.debt,
-      interestRate: difficultyDef.interestRate,
+      capital: FIXED_DIFFICULTY.capital,
+      debt: FIXED_DIFFICULTY.debt,
+      interestRate: FIXED_DIFFICULTY.interestRate,
       companyHealth:
         advisor === 'strategist'
           ? MAX_HEALTH
@@ -227,6 +283,9 @@ function createRunState({ advisor, difficulty, meta, legacyCards }) {
             : 10,
       meta,
       legacyCards,
+      settings,
+      playHistory,
+      saveExists,
       priceResistance:
         (advisor === 'trader' ? 0.01 : 0) +
         (advisor === 'auditor' ? 0 : 0),
@@ -238,19 +297,23 @@ function createRunState({ advisor, difficulty, meta, legacyCards }) {
   const next = {
     ...base,
     currentEventCardId: null,
+    warningAlerts: [],
   }
 
+  next.rivals = ensureRivalsJoined(next.rivals, 1, next.industryTier)
   next.currentEventCardId = drawCurrentEvent({
     ...next,
-    rivals: ensureRivalsJoined(next.rivals, 1, next.industryTier),
+    rivals: next.rivals,
   })
+  next.warningAlerts = getWarningAlerts(next)
 
   return next
 }
 
-function composeTurnPlan(state, strategyId) {
+function composeTurnPlan(state, strategyId, orderTierId = state.selectedOrderTier) {
   const strategy = STRATEGIES[strategyId]
-  if (!strategy) {
+  const orderTier = ORDER_TIERS[orderTierId]
+  if (!strategy || !orderTier) {
     return null
   }
 
@@ -272,10 +335,15 @@ function composeTurnPlan(state, strategyId) {
       (state.activeBlackSwan?.demandMul ?? 1) *
       (1 + getEffectValue(state, 'demandMul')),
   )
+  const [minimumOrderMul, maximumOrderMul] = strategy.orderRange
+  const midpointOrderMul = roundTo((minimumOrderMul + maximumOrderMul) / 2, 2)
+  const orderMultipliers = [minimumOrderMul, midpointOrderMul, maximumOrderMul]
+  const chosenOrderMul = orderMultipliers[orderTier.index] ?? midpointOrderMul
 
   return {
     strategyId,
-    orderQty: Math.max(50, Math.round(predictedDemand * strategy.orderMul)),
+    orderTierId,
+    orderQty: Math.max(25, Math.round(predictedDemand * chosenOrderMul)),
     sellPrice: Math.round(vendorUnitCost * strategy.priceMul),
     vendorUnitCost,
     qualityMode: strategy.qualityMode,
@@ -289,6 +357,7 @@ function composeTurnPlan(state, strategyId) {
     awareness:
       (state.marketing?.awarenessBonus ?? 0) + Number(strategy.awarenessBonus ?? 0),
     predictedDemand,
+    orderMultipliers,
   }
 }
 
@@ -428,6 +497,29 @@ function maybeTriggerBlackSwan(state) {
   }
 }
 
+function buildSaveSnapshot(state) {
+  return {
+    ...state,
+    screen: 'game',
+    saveExists: true,
+    toasts: [],
+  }
+}
+
+function buildHistoryEntry(state, status) {
+  const latestLegacy = state.legacyCards?.[state.legacyCards.length - 1]
+  return {
+    id: `${Date.now()}-${state.floor}`,
+    advisor: state.advisor,
+    advisorName: ADVISORS[state.advisor]?.name ?? state.advisor,
+    floor: state.floor,
+    result: status,
+    netWorth: state.capital - state.debt,
+    legacyCard: latestLegacy?.name ?? latestLegacy?.label ?? null,
+    createdAt: new Date().toISOString(),
+  }
+}
+
 export const useGameStore = create((set, get) => {
   const dismissToast = (toastId) => {
     set((state) => ({
@@ -450,69 +542,173 @@ export const useGameStore = create((set, get) => {
 
     dismissToast,
 
+    backToTitle: () =>
+      set((state) => ({
+        ...createBaseState(),
+        meta: state.meta,
+        legacyCards: state.legacyCards,
+        playHistory: loadRunHistory(),
+        settings: state.settings,
+        saveExists: hasSaveSlot(),
+      })),
+
+    openHistoryScreen: () =>
+      set((state) => ({
+        ...state,
+        screen: 'history',
+        playHistory: loadRunHistory(),
+        saveExists: hasSaveSlot(),
+      })),
+
+    openSettingsScreen: () =>
+      set((state) => ({
+        ...state,
+        screen: 'settings',
+      })),
+
+    startNewGame: () =>
+      set((state) => ({
+        ...state,
+        screen: 'advisor',
+        advisorDraft: state.advisor ?? 'analyst',
+      })),
+
+    continueRun: () => {
+      const saved = loadSaveSlot()
+      if (!saved) {
+        return
+      }
+
+      set((state) => ({
+        ...state,
+        ...saved,
+        screen: 'game',
+        gameStatus: 'playing',
+        saveExists: true,
+        playHistory: loadRunHistory(),
+        settings: state.settings,
+        toasts: [],
+      }))
+    },
+
+    updateSettings: (partialSettings) =>
+      set((state) => {
+        const nextSettings = {
+          ...state.settings,
+          ...partialSettings,
+        }
+        saveSettings(nextSettings)
+        return {
+          ...state,
+          settings: nextSettings,
+        }
+      }),
+
     setAdvisorDraft: (advisorId) =>
       set((state) => ({
         ...state,
         advisorDraft: advisorId,
       })),
 
-    confirmAdvisor: () =>
-      set((state) => ({
-        ...state,
-        advisor: state.advisorDraft,
-      })),
-
-    setDifficultyDraft: (difficultyId) =>
-      set((state) => ({
-        ...state,
-        difficultyDraft: difficultyId,
-      })),
-
-    startGame: () => {
+    confirmAdvisor: () => {
       const state = get()
-      if (!state.advisor || !state.difficultyDraft) {
+      if (!state.advisorDraft) {
         return
       }
 
       const next = createRunState({
-        advisor: state.advisor,
-        difficulty: state.difficultyDraft,
+        advisor: state.advisorDraft,
         meta: state.meta,
         legacyCards: state.legacyCards,
+        settings: state.settings,
+        playHistory: state.playHistory,
+        saveExists: true,
       })
 
       set({
         ...next,
-        currentEventCardId: drawCurrentEvent(next),
+        advisor: state.advisorDraft,
+        saveExists: true,
       })
+      saveSaveSlot(buildSaveSnapshot({ ...get(), ...next, advisor: state.advisorDraft }))
     },
 
     restartGame: () => {
       const state = get()
-      if (!state.advisor || !state.difficulty) {
-        set(createBaseState())
+      if (!state.advisor) {
+        set({
+          ...createBaseState(),
+          screen: 'title',
+        })
         return
       }
+
       const next = createRunState({
         advisor: state.advisor,
-        difficulty: state.difficulty,
         meta: state.meta,
         legacyCards: state.legacyCards,
+        settings: state.settings,
+        playHistory: state.playHistory,
+        saveExists: true,
       })
+
       set({
         ...next,
-        currentEventCardId: drawCurrentEvent(next),
+        advisor: state.advisor,
+        saveExists: true,
       })
+      saveSaveSlot(buildSaveSnapshot({ ...get(), ...next, advisor: state.advisor }))
     },
 
-    goToAdvisorSelect: () => set(createBaseState()),
+    goToAdvisorSelect: () =>
+      set((state) => ({
+        ...createBaseState(),
+        screen: 'advisor',
+        meta: state.meta,
+        legacyCards: state.legacyCards,
+        playHistory: loadRunHistory(),
+        settings: state.settings,
+        saveExists: hasSaveSlot(),
+        advisorDraft: state.advisor ?? 'analyst',
+      })),
+
+    getOrderOptions: (strategyId = get().selectedStrategyId) => {
+      const state = get()
+      if (!strategyId || !STRATEGIES[strategyId]) {
+        return []
+      }
+
+      return Object.keys(ORDER_TIERS).map((orderTierId) => {
+        const plan = composeTurnPlan(state, strategyId, orderTierId)
+        return {
+          id: orderTierId,
+          label: ORDER_TIERS[orderTierId].label,
+          orderQty: plan?.orderQty ?? 0,
+          prepayment:
+            (plan?.orderQty ?? 0) * (plan?.previewUnitCost ?? 0),
+        }
+      })
+    },
 
     selectStrategy: (strategyId) => {
       set((state) => ({
         ...state,
         selectedStrategyId: strategyId,
+        selectedOrderTier: null,
       }))
-      if (get().currentEventResolved) {
+      const current = get()
+      if (current.currentEventResolved && current.selectedOrderTier) {
+        get().advanceFloor()
+      }
+    },
+
+    selectOrderTier: (orderTierId) => {
+      set((state) => ({
+        ...state,
+        selectedOrderTier: orderTierId,
+      }))
+      const current = get()
+      if (current.currentEventResolved && current.selectedStrategyId) {
         get().advanceFloor()
       }
     },
@@ -543,7 +739,7 @@ export const useGameStore = create((set, get) => {
       }))
 
       enqueueToast(message, success ? 'positive' : 'negative')
-      if (get().selectedStrategyId) {
+      if (get().selectedStrategyId && get().selectedOrderTier) {
         get().advanceFloor()
       }
     },
@@ -552,6 +748,8 @@ export const useGameStore = create((set, get) => {
       set((state) => ({
         ...state,
         settlementModalOpen: false,
+        shopScreenOpen: state.gameStatus === 'playing',
+        shopOpen: true,
       })),
 
     selectReward: (rewardId) =>
@@ -562,7 +760,7 @@ export const useGameStore = create((set, get) => {
 
     claimReward: () => {
       const state = get()
-      if (!state.rewardPending || !state.rewardSelection) {
+      if (!state.rewardPending || !state.rewardSelection || state.rewardClaimed) {
         return
       }
 
@@ -575,20 +773,53 @@ export const useGameStore = create((set, get) => {
         {
           ...state,
           credits: state.credits + state.rewardPending.credits,
-          rewardPending: null,
-          rewardSelection: null,
         },
         reward,
       )
 
       set({
         ...nextState,
-        currentEventCardId: drawCurrentEvent(nextState),
+        rewardClaimed: true,
+      })
+      saveSaveSlot(buildSaveSnapshot(get()))
+    },
+
+    continueFromShop: () => {
+      const state = get()
+      if (!state.shopScreenOpen) {
+        return
+      }
+
+      const nextState = {
+        ...state,
+        shopScreenOpen: false,
+        shopOpen: false,
+        rewardPending: null,
+        rewardSelection: null,
+        rewardClaimed: false,
         currentEventResolved: false,
         currentEventChoiceId: null,
         lastEventResult: null,
         selectedStrategyId: null,
-      })
+        selectedOrderTier: null,
+        currentEventCardId: null,
+        warningAlerts: [],
+        shopPurchasesThisFloor: [],
+      }
+
+      const currentEventCardId = drawCurrentEvent(nextState)
+      const withEvent = {
+        ...nextState,
+        currentEventCardId,
+      }
+      const warningAlerts = getWarningAlerts(withEvent)
+      const finalState = {
+        ...withEvent,
+        warningAlerts,
+      }
+
+      set(finalState)
+      saveSaveSlot(buildSaveSnapshot(finalState))
     },
 
     toggleShop: () =>
@@ -637,15 +868,21 @@ export const useGameStore = create((set, get) => {
         activeEffects,
         shopPurchasesThisFloor: [...current.shopPurchasesThisFloor, shopId],
       }))
+      saveSaveSlot(buildSaveSnapshot(get()))
     },
 
     advanceFloor: () => {
       const state = get()
-      if (state.gameStatus !== 'playing' || !state.selectedStrategyId || !state.currentEventResolved) {
+      if (
+        state.gameStatus !== 'playing' ||
+        !state.selectedStrategyId ||
+        !state.selectedOrderTier ||
+        !state.currentEventResolved
+      ) {
         return
       }
 
-      const plan = composeTurnPlan(state, state.selectedStrategyId)
+      const plan = composeTurnPlan(state, state.selectedStrategyId, state.selectedOrderTier)
       if (!plan) {
         return
       }
@@ -798,6 +1035,7 @@ export const useGameStore = create((set, get) => {
 
       const draftState = {
         ...state,
+        screen: 'game',
         floor: nextFloor,
         econPhase: nextEconPhase,
         capital: nextCapital,
@@ -809,6 +1047,7 @@ export const useGameStore = create((set, get) => {
         activeBlackSwan,
         blackSwanSeen,
         activeEffects: nextEffectList(state.activeEffects),
+        warningAlerts: [],
       }
 
       const rewardPending = createRewardDraft({
@@ -848,14 +1087,17 @@ export const useGameStore = create((set, get) => {
         meta,
         advisorFeeTotal: state.advisorFeeTotal + advisorFee,
         settlementModalOpen: gameStatus === 'playing',
+        shopScreenOpen: false,
         lastSettlement: settlement,
         rewardPending: gameStatus === 'playing' ? rewardPending : null,
         rewardSelection: null,
+        rewardClaimed: false,
         currentEventCardId: null,
         currentEventResolved: false,
         currentEventChoiceId: null,
         lastEventResult: null,
         selectedStrategyId: null,
+        selectedOrderTier: null,
         shopPurchasesThisFloor: [],
         previewOpen: false,
         floorPhase:
@@ -877,6 +1119,19 @@ export const useGameStore = create((set, get) => {
           ...state.decisionLog,
         ].slice(0, 12),
       })
+
+      const latestState = get()
+      if (gameStatus === 'playing') {
+        saveSaveSlot(buildSaveSnapshot(latestState))
+      } else {
+        clearSaveSlot()
+        const playHistory = appendRunHistory(buildHistoryEntry(latestState, gameStatus))
+        set({
+          screen: 'gameover',
+          playHistory,
+          saveExists: false,
+        })
+      }
 
       enqueueToast(
         `${state.floor}층 정산 완료 · ${netProfit >= 0 ? '+' : ''}${Math.round(netProfit).toLocaleString()}원`,

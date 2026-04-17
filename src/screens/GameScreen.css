@@ -1,26 +1,26 @@
 .cr2-game-screen {
   min-height: 100vh;
-  background: var(--cr2-bg);
+  background:
+    radial-gradient(circle at top right, rgba(240, 165, 0, 0.08), transparent 20%),
+    radial-gradient(circle at bottom left, rgba(167, 139, 250, 0.08), transparent 24%),
+    var(--cr2-bg);
 }
 
 .cr2-game-screen__body {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.8fr);
-  gap: 20px;
-  padding: 20px;
+  grid-template-columns: minmax(0, 1.65fr) minmax(320px, 0.8fr);
+  gap: 18px;
+  padding: 18px;
 }
 
-.cr2-game-screen__main,
-.cr2-game-screen__side {
+.cr2-game-screen__main {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   align-content: start;
 }
 
-@media (max-width: 960px) {
-  .cr2-game-screen__body,
-  .cr2-reward-screen__grid,
-  .cr2-strategy__grid {
+@media (max-width: 980px) {
+  .cr2-game-screen__body {
     grid-template-columns: 1fr;
   }
 }

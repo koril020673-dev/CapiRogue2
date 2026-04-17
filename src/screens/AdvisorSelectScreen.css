@@ -1,72 +1,135 @@
-.cr2-advisor-screen,
-.cr2-difficulty-screen,
-.cr2-gameover-screen {
+.cr2-advisor-select {
   min-height: 100vh;
-  display: grid;
-  gap: 24px;
-  padding: 40px 24px;
-  align-content: center;
+  padding: 24px;
 }
 
-.cr2-advisor-screen__head,
-.cr2-difficulty-screen__head {
+.cr2-advisor-select__shell {
   display: grid;
-  gap: 8px;
-  text-align: center;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+  min-height: calc(100vh - 48px);
 }
 
-.cr2-advisor-screen__eyebrow,
-.cr2-difficulty-screen__eyebrow {
+.cr2-advisor-select__rail,
+.cr2-advisor-select__detail {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 24px;
+  background: var(--cr2-s1);
+}
+
+.cr2-advisor-select__rail-head {
+  display: grid;
+  gap: 6px;
+}
+
+.cr2-advisor-select__eyebrow {
   color: var(--cr2-dim);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
-.cr2-advisor-screen__grid,
-.cr2-difficulty-screen__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-}
-
-.cr2-advisor-screen__card,
-.cr2-difficulty-screen__card {
+.cr2-advisor-select__list {
   display: grid;
   gap: 10px;
-  padding: 18px;
+  align-content: start;
+  overflow: auto;
+}
+
+.cr2-advisor-select__list-item,
+.cr2-advisor-select__back,
+.cr2-advisor-select__confirm {
+  padding: 14px 16px;
   border: 1px solid var(--cr2-border);
-  border-radius: 22px;
-  background: var(--cr2-s1);
+  border-radius: 16px;
+  background: var(--cr2-s2);
   color: var(--cr2-text);
+}
+
+.cr2-advisor-select__list-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
   text-align: left;
   cursor: pointer;
 }
 
-.cr2-advisor-screen__card[data-locked='true'] {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.cr2-advisor-screen__card[data-selected='true'],
-.cr2-difficulty-screen__card[data-selected='true'] {
+.cr2-advisor-select__list-item[data-selected='true'] {
   border-color: var(--cr2-accent);
-  box-shadow: 0 0 0 1px var(--cr2-accent);
 }
 
-.cr2-advisor-screen__card span,
-.cr2-advisor-screen__card small,
-.cr2-difficulty-screen__card span,
-.cr2-difficulty-screen__card small {
-  color: var(--cr2-neutral);
+.cr2-advisor-select__list-item[data-locked='true'] {
+  opacity: 0.74;
 }
 
-.cr2-advisor-screen__confirm,
-.cr2-difficulty-screen__confirm {
-  justify-self: center;
-  min-width: 220px;
-  padding: 14px 18px;
-  border: 0;
+.cr2-advisor-select__detail {
+  border-color: color-mix(in srgb, var(--cr2-advisor-color) 45%, var(--cr2-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cr2-advisor-color) 18%, transparent);
+}
+
+.cr2-advisor-select__detail-head {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.cr2-advisor-select__icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--cr2-advisor-color) 22%, var(--cr2-s2));
+  font-size: 2rem;
+}
+
+.cr2-advisor-select__info-grid,
+.cr2-advisor-select__traits {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cr2-advisor-select__info-grid div,
+.cr2-advisor-select__traits div {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--cr2-border);
   border-radius: 16px;
-  background: var(--cr2-accent);
-  color: var(--cr2-bg);
-  cursor: pointer;
+  background: var(--cr2-s2);
+}
+
+.cr2-advisor-select__info-grid span,
+.cr2-advisor-select__traits span {
+  color: var(--cr2-dim);
+  font-size: 0.84rem;
+}
+
+.cr2-advisor-select__quote {
+  margin: 0;
+  padding: 18px;
+  border-left: 4px solid var(--cr2-advisor-color);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.cr2-advisor-select__confirm:disabled {
+  opacity: 0.45;
+}
+
+@media (max-width: 920px) {
+  .cr2-advisor-select__shell {
+    grid-template-columns: 1fr;
+  }
+
+  .cr2-advisor-select__info-grid,
+  .cr2-advisor-select__traits {
+    grid-template-columns: 1fr;
+  }
 }

@@ -23,9 +23,7 @@ export function SettlementModal() {
             <p className="cr2-settlement-modal__eyebrow">Settlement</p>
             <h2>Floor {settlement.floor} 완료</h2>
           </div>
-          <button type="button" className="cr2-settlement-modal__close" onClick={closeSettlementModal}>
-            ✕
-          </button>
+          <span className="cr2-settlement-modal__badge">{settlement.floor}층</span>
         </div>
 
         <div className="cr2-settlement-modal__grid">
@@ -34,11 +32,11 @@ export function SettlementModal() {
             <strong>{fmt(settlement.revenue)}원</strong>
           </article>
           <article>
-            <span>선결제</span>
+            <span>원가</span>
             <strong>{fmt(settlement.prepayment)}원</strong>
           </article>
           <article>
-            <span>고정비 + 수수료</span>
+            <span>고정비</span>
             <strong>{fmt(settlement.fixedTotal + settlement.advisorFee)}원</strong>
           </article>
         </div>
@@ -54,7 +52,7 @@ export function SettlementModal() {
           </span>
           {settlement.waste > 0 && (
             <span className="cr2-settlement-modal__waste">
-              폐기 {settlement.waste}개 (-{fmt(settlement.wasteCost)}원)
+              ⚠ 폐기 {settlement.waste}개 (-{fmt(settlement.wasteCost)}원)
             </span>
           )}
           <span>점유율 {(settlement.myShare * 100).toFixed(1)}%</span>
@@ -64,11 +62,16 @@ export function SettlementModal() {
           <span>
             체력 {settlement.healthBefore} → {settlement.healthAfter}
           </span>
+          <span>
+            모멘텀 {settlement.momentumHistory.map((item) => (item === 'up' ? '↑' : '↓')).join('')}
+            {' '}
+            {settlement.momentum >= 0 ? `+${settlement.momentum}` : settlement.momentum}
+          </span>
           {settlement.educationHint && <span>💡 {settlement.educationHint}</span>}
         </div>
 
         <button type="button" className="cr2-settlement-modal__next" onClick={closeSettlementModal}>
-          결과 확인
+          확인
         </button>
       </div>
     </div>

@@ -1,0 +1,57 @@
+.cr2-order-select {
+  display: grid;
+  gap: 14px;
+}
+
+.cr2-order-select__eyebrow {
+  color: var(--cr2-dim);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.cr2-order-select__head {
+  display: grid;
+  gap: 6px;
+}
+
+.cr2-order-select__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cr2-order-select__card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 18px;
+  background: var(--cr2-s2);
+  color: var(--cr2-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.cr2-order-select__card:hover {
+  transform: translateY(-2px);
+}
+
+.cr2-order-select__card[data-selected='true'] {
+  border-color: var(--cr2-accent);
+  background: color-mix(in srgb, var(--cr2-s2) 85%, var(--cr2-accent));
+}
+
+.cr2-order-select__card small {
+  color: var(--cr2-neutral);
+}
+
+@media (max-width: 760px) {
+  .cr2-order-select__grid {
+    grid-template-columns: 1fr;
+  }
+}

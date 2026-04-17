@@ -13,6 +13,7 @@
   --cr2-neutral: #94a3b8;
   --cr2-text: #f0ede8;
   --cr2-dim: #6b7280;
+  --cr2-purple: #a78bfa;
   font-family: 'Inter', system-ui, sans-serif;
   color: var(--cr2-text);
   background: var(--cr2-bg);

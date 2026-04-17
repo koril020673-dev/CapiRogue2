@@ -31,18 +31,19 @@
   font-size: 0.8rem;
 }
 
-.cr2-settlement-modal__close,
+.cr2-settlement-modal__badge,
 .cr2-settlement-modal__next {
   border: 1px solid var(--cr2-border);
   border-radius: 14px;
   background: transparent;
   color: var(--cr2-text);
-  cursor: pointer;
 }
 
-.cr2-settlement-modal__close {
-  width: 40px;
-  height: 40px;
+.cr2-settlement-modal__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--cr2-neutral);
 }
 
 .cr2-settlement-modal__grid article {
@@ -85,4 +86,5 @@
 
 .cr2-settlement-modal__next {
   padding: 14px;
+  cursor: pointer;
 }
