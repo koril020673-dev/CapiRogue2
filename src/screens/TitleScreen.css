@@ -2,18 +2,19 @@
   position: relative;
   min-height: 100vh;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, #bedae5 0%, #9cc6d4 21%, #e4b98a 58%, #362d3e 100%);
+  background: var(--cr2-title-background);
 }
 
 .cr2-title-scene__backdrop {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 20% 18%, rgba(255, 246, 224, 0.68), transparent 20%),
-    radial-gradient(circle at 47% 54%, rgba(216, 54, 60, 0.12), transparent 18%),
-    radial-gradient(circle at 83% 78%, rgba(54, 45, 62, 0.55), transparent 26%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 35%);
+    radial-gradient(circle at 22% 18%, var(--cr2-title-glow-a), transparent 18%),
+    radial-gradient(circle at 52% 58%, var(--cr2-title-glow-c), transparent 22%),
+    radial-gradient(circle at 84% 26%, var(--cr2-title-glow-b), transparent 26%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 42%);
+  filter: blur(16px);
+  transform: scale(1.08);
   pointer-events: none;
 }
 
@@ -31,12 +32,12 @@
 .cr2-title-scene__menu-panel {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 30px;
   backdrop-filter: blur(18px);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 28px 90px rgba(0, 0, 0, 0.22);
+    0 28px 90px rgba(0, 0, 0, 0.24);
 }
 
 .cr2-title-scene__hero {
@@ -45,28 +46,27 @@
   gap: 22px;
   padding: 26px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(14, 14, 20, 0.1)),
-    rgba(27, 22, 30, 0.18);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.08)),
+    linear-gradient(180deg, var(--cr2-title-hero-tint), transparent 24%),
+    var(--cr2-title-hero-surface);
 }
 
 .cr2-title-scene__hero::before {
   content: '';
   position: absolute;
   inset: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 24px;
   pointer-events: none;
 }
 
 .cr2-title-scene__skyline {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 24px;
   isolation: isolate;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04) 34%, rgba(54, 45, 62, 0.2) 100%),
-    rgba(18, 16, 24, 0.22);
   min-height: 360px;
+  box-shadow: 0 0 90px var(--cr2-title-image-bleed);
 }
 
 .cr2-title-scene__skyline-image,
@@ -82,22 +82,27 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center center;
+  border-radius: 24px;
 }
 
 .cr2-title-scene__skyline-shade {
   z-index: 1;
+  border-radius: 24px;
   background:
-    linear-gradient(180deg, rgba(255, 251, 243, 0.16), transparent 22%),
-    linear-gradient(180deg, rgba(15, 15, 20, 0), rgba(15, 15, 20, 0.1) 60%, rgba(15, 15, 20, 0.24) 100%);
+    linear-gradient(180deg, rgba(255, 251, 243, 0.08), transparent 20%),
+    linear-gradient(180deg, rgba(7, 7, 10, 0), rgba(7, 7, 10, 0.08) 62%, rgba(7, 7, 10, 0.22) 100%);
 }
 
 .cr2-title-scene__skyline-glow {
   z-index: 2;
+  border-radius: 24px;
   background:
-    radial-gradient(circle at 18% 16%, rgba(255, 241, 220, 0.3), transparent 18%),
-    radial-gradient(circle at 80% 84%, rgba(54, 45, 62, 0.24), transparent 22%);
+    radial-gradient(circle at 18% 16%, var(--cr2-title-image-glow-b), transparent 16%),
+    radial-gradient(circle at 50% 56%, var(--cr2-title-image-glow-a), transparent 30%),
+    radial-gradient(circle at 84% 76%, var(--cr2-title-image-glow-b), transparent 18%);
+  filter: blur(8px);
   mix-blend-mode: screen;
+  opacity: 0.9;
   pointer-events: none;
 }
 
@@ -108,7 +113,7 @@
   border-radius: 18px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -60px 80px rgba(0, 0, 0, 0.1);
+    inset 0 -60px 80px rgba(0, 0, 0, 0.16);
   pointer-events: none;
 }
 
@@ -120,7 +125,7 @@
 }
 
 .cr2-title-scene__eyebrow {
-  color: rgba(255, 248, 236, 0.9);
+  color: var(--cr2-title-text-soft);
   font-size: 0.8rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -128,17 +133,17 @@
 
 .cr2-title-scene__brand h1 {
   margin: 0;
-  color: rgba(255, 249, 241, 0.98);
+  color: var(--cr2-title-text-strong);
   font-size: clamp(3.4rem, 7vw, 6rem);
   line-height: 0.92;
   letter-spacing: -0.04em;
   text-shadow:
     0 4px 20px rgba(0, 0, 0, 0.18),
-    0 18px 50px rgba(54, 45, 62, 0.34);
+    0 18px 50px rgba(0, 0, 0, 0.34);
 }
 
 .cr2-title-scene__subtitle {
-  color: rgba(54, 45, 62, 0.94);
+  color: color-mix(in srgb, var(--cr2-title-accent) 74%, white);
   font-size: clamp(1rem, 2vw, 1.2rem);
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -146,7 +151,7 @@
 
 .cr2-title-scene__flavor {
   max-width: 52ch;
-  color: rgba(35, 27, 39, 0.8);
+  color: var(--cr2-title-text-soft);
   font-size: 1rem;
   line-height: 1.65;
 }
@@ -161,22 +166,22 @@
   display: grid;
   gap: 6px;
   padding: 14px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
-    rgba(54, 45, 62, 0.26);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    var(--cr2-title-card-surface);
 }
 
 .cr2-title-scene__hud span {
-  color: rgba(255, 248, 236, 0.62);
+  color: var(--cr2-title-text-soft);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
 
 .cr2-title-scene__hud strong {
-  color: rgba(255, 249, 241, 0.96);
+  color: var(--cr2-title-text-strong);
   font-size: 1rem;
 }
 
@@ -187,7 +192,7 @@
   padding: 24px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
-    rgba(27, 23, 33, 0.62);
+    var(--cr2-title-menu-surface);
 }
 
 .cr2-title-scene__menu-panel::before {
@@ -207,7 +212,7 @@
 }
 
 .cr2-title-scene__menu-kicker {
-  color: rgba(228, 185, 138, 0.82);
+  color: color-mix(in srgb, var(--cr2-title-accent) 68%, white);
   font-size: 0.78rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -216,6 +221,7 @@
 .cr2-title-scene__menu-head h2 {
   font-size: 1.9rem;
   line-height: 1.1;
+  color: var(--cr2-title-text-strong);
 }
 
 .cr2-title-scene__menu-list {
@@ -235,8 +241,8 @@
   border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
-    rgba(23, 23, 31, 0.56);
-  color: var(--cr2-text);
+    var(--cr2-title-card-surface);
+  color: var(--cr2-title-text-strong);
   text-align: left;
   cursor: pointer;
   transition:
@@ -248,10 +254,10 @@
 
 .cr2-title-scene__menu-btn:hover {
   transform: translateY(-2px);
-  border-color: rgba(228, 185, 138, 0.35);
+  border-color: color-mix(in srgb, var(--cr2-title-accent) 38%, rgba(255, 255, 255, 0.16));
   background:
-    linear-gradient(180deg, rgba(228, 185, 138, 0.08), rgba(255, 255, 255, 0.03)),
-    rgba(23, 23, 31, 0.72);
+    linear-gradient(180deg, color-mix(in srgb, var(--cr2-title-accent) 8%, transparent), rgba(255, 255, 255, 0.02)),
+    color-mix(in srgb, var(--cr2-title-card-surface) 88%, black);
 }
 
 .cr2-title-scene__menu-btn:disabled {
@@ -266,7 +272,7 @@
 }
 
 .cr2-title-scene__menu-sublabel {
-  color: rgba(240, 237, 232, 0.62);
+  color: var(--cr2-title-text-soft);
   font-size: 0.88rem;
   line-height: 1.55;
 }

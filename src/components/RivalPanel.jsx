@@ -1,8 +1,8 @@
 import './RivalPanel.css'
-import auraLogo from '../assets/rival-logos/aura.png'
-import megaflexLogo from '../assets/rival-logos/megaflex.png'
-import memecatchLogo from '../assets/rival-logos/memecatch.png'
-import nexuscoreLogo from '../assets/rival-logos/nexuscore.png'
+import auraLogo from '../../RivalRogoImages/aura.png'
+import megaflexLogo from '../../RivalRogoImages/megaflex.png'
+import memecatchLogo from '../../RivalRogoImages/mimCatch.png'
+import nexuscoreLogo from '../../RivalRogoImages/nexuscore.png'
 import { RIVAL_ORDER, RIVALS } from '../constants/rivals.js'
 import { useGameStore } from '../store/useGameStore.js'
 
@@ -11,6 +11,13 @@ const RIVAL_LOGOS = {
   aura: auraLogo,
   memecatch: memecatchLogo,
   nexuscore: nexuscoreLogo,
+}
+
+const RIVAL_DISPLAY_NAMES = {
+  megaflex: '메가플렉스',
+  aura: '아우라',
+  memecatch: '밈캐치',
+  nexuscore: '넥서스코어',
 }
 
 function getRivalStatus(rival) {
@@ -49,23 +56,30 @@ export function RivalPanel() {
           const status = getRivalStatus(rival)
 
           return (
-            <article key={rivalId} className="cr2-rival-panel__card" data-out={status === '퇴출'}>
+            <article
+              key={rivalId}
+              className="cr2-rival-panel__card"
+              data-out={status === '퇴출'}
+              style={{ '--cr2-rival-accent': definition.color }}
+            >
               <div className="cr2-rival-panel__top">
                 <strong className="cr2-rival-panel__identity">
                   <span className="cr2-rival-panel__logo-wrap">
                     <img
                       className="cr2-rival-panel__logo"
                       src={RIVAL_LOGOS[rivalId]}
-                      alt={`${rival?.name ?? definition.name} logo`}
+                      alt={`${RIVAL_DISPLAY_NAMES[rivalId]} 로고`}
                     />
                   </span>
-                  <span>{rival?.name ?? definition.name}</span>
+                  <span>{RIVAL_DISPLAY_NAMES[rivalId]}</span>
                 </strong>
                 <span>{status}</span>
               </div>
+
               <div className="cr2-rival-panel__bar">
                 <span style={{ width: `${ratio * 100}%` }} />
               </div>
+
               <div className="cr2-rival-panel__meta">
                 <span>{Math.round(rival?.currentPrice ?? definition.basePrice).toLocaleString()}원</span>
                 <span>{Number(rival?.marketShare ?? 0).toFixed(1)}%</span>
