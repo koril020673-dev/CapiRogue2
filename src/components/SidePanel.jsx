@@ -3,7 +3,7 @@ import { RivalPanel } from './RivalPanel.jsx'
 import { WarningAlerts } from './WarningAlerts.jsx'
 import { useGameStore } from '../store/useGameStore.js'
 
-function formatPercentFromPoints(value) {
+function formatPercent(value) {
   return `${Number(value ?? 0).toFixed(1)}%`
 }
 
@@ -20,9 +20,10 @@ export function SidePanel() {
     <aside className="cr2-side-panel" data-crisis={companyHealth <= 3}>
       <section className="cr2-side-panel__company">
         <div className="cr2-side-panel__head">
-          <p className="cr2-side-panel__eyebrow">My Company</p>
-          <h2>내 회사</h2>
+          <p className="cr2-side-panel__eyebrow">TACTICAL READOUT</p>
+          <h2>내 회사 현황</h2>
         </div>
+
         <dl className="cr2-side-panel__stats">
           <div>
             <dt>현금</dt>
@@ -46,7 +47,7 @@ export function SidePanel() {
           </div>
           <div>
             <dt>저항성</dt>
-            <dd>{formatPercentFromPoints(priceResistance * 100)}</dd>
+            <dd>{formatPercent(priceResistance * 100)}</dd>
           </div>
           <div>
             <dt>점유율</dt>

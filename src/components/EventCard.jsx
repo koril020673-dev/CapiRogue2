@@ -2,6 +2,8 @@ import './EventCard.css'
 import { getEventCardById } from '../constants/docEvents.js'
 import { useGameStore } from '../store/useGameStore.js'
 
+const CHOICE_INDEX = ['01', '02', '03', '04']
+
 function getChoiceTone(choice) {
   if (choice.successRate >= 0.95) {
     return 'safe'
@@ -30,17 +32,23 @@ export function EventCard() {
   return (
     <section className="cr2-event-card">
       <div className="cr2-event-card__head">
-        <p className="cr2-event-card__eyebrow">Choice 3</p>
-        <h2>{card.name}</h2>
+        <div>
+          <p className="cr2-event-card__eyebrow">3. 결재 카드</p>
+          <h2>{card.name}</h2>
+        </div>
+        <span className="cr2-event-card__badge">EVENT</span>
       </div>
+
       <p className="cr2-event-card__desc">{card.description}</p>
+
       <div className="cr2-event-card__tags">
         {card.tags.map((tag) => (
           <span key={tag}>{tag}</span>
         ))}
       </div>
+
       <div className="cr2-event-card__choices">
-        {card.choices.map((choice) => (
+        {card.choices.map((choice, index) => (
           <button
             key={choice.id}
             type="button"
@@ -49,8 +57,11 @@ export function EventCard() {
             disabled={currentEventResolved}
             onClick={() => resolveEventChoice(choice.id)}
           >
-            <strong>{choice.label}</strong>
-            <span>{choice.probabilityHint}</span>
+            <div className="cr2-event-card__choice-top">
+              <span className="cr2-event-card__choice-index">{CHOICE_INDEX[index] ?? '00'}</span>
+              <strong>{choice.label}</strong>
+            </div>
+            <span className="cr2-event-card__choice-hint">{choice.probabilityHint}</span>
           </button>
         ))}
       </div>

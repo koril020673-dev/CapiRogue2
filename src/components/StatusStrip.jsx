@@ -1,9 +1,12 @@
 import './StatusStrip.css'
 import { useGameStore } from '../store/useGameStore.js'
 
-function renderHealthBar(current, max) {
-  const filled = Math.max(0, Math.min(max, current))
-  return `${'█'.repeat(filled)}${'░'.repeat(Math.max(0, max - filled))}`
+function getMomentumArrows(momentumHistory) {
+  if (!momentumHistory.length) {
+    return '대기'
+  }
+
+  return momentumHistory.map((entry) => (entry === 'up' ? '▲' : '▼')).join(' ')
 }
 
 export function StatusStrip() {
@@ -17,19 +20,34 @@ export function StatusStrip() {
 
   return (
     <div className="cr2-status-strip" data-critical={companyHealth <= 3}>
-      <span className="cr2-status-strip__item">Floor {floor}</span>
-      <span className="cr2-status-strip__item">
-        {renderHealthBar(companyHealth, maxHealth)} {companyHealth}
-      </span>
-      <span className="cr2-status-strip__item">
-        {momentumHistory.length > 0
-          ? momentumHistory.map((entry) => (entry === 'up' ? '↑' : '↓')).join('')
-          : '·'}
-        {' '}
-        {momentum >= 0 ? `+${momentum}` : momentum}
-      </span>
-      <span className="cr2-status-strip__item">🔷 {credits}C</span>
-      <span className="cr2-status-strip__item">💰 {Math.round(capital).toLocaleString()}원</span>
+      <div className="cr2-status-strip__item">
+        <span className="cr2-status-strip__label">층수</span>
+        <strong>Floor {floor}</strong>
+      </div>
+
+      <div className="cr2-status-strip__item">
+        <span className="cr2-status-strip__label">체력</span>
+        <strong>
+          {companyHealth}/{maxHealth}
+        </strong>
+      </div>
+
+      <div className="cr2-status-strip__item">
+        <span className="cr2-status-strip__label">모멘텀</span>
+        <strong>
+          {getMomentumArrows(momentumHistory)} {momentum >= 0 ? `+${momentum}` : momentum}
+        </strong>
+      </div>
+
+      <div className="cr2-status-strip__item">
+        <span className="cr2-status-strip__label">크레딧</span>
+        <strong>{credits}C</strong>
+      </div>
+
+      <div className="cr2-status-strip__item cr2-status-strip__item--cash">
+        <span className="cr2-status-strip__label">현금</span>
+        <strong>{Math.round(capital).toLocaleString()}원</strong>
+      </div>
     </div>
   )
 }

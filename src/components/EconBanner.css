@@ -1,21 +1,47 @@
 .cr2-econ-banner {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 18px;
-  border: 1px solid var(--cr2-border);
-  border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)), var(--cr2-s1);
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(21, 21, 29, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.cr2-econ-banner[data-phase='boom'] {
+  border-color: rgba(240, 165, 0, 0.22);
+}
+
+.cr2-econ-banner[data-phase='growth'] {
+  border-color: rgba(74, 222, 128, 0.22);
+}
+
+.cr2-econ-banner[data-phase='contraction'],
+.cr2-econ-banner[data-phase='recession'] {
+  border-color: rgba(255, 107, 107, 0.22);
 }
 
 .cr2-econ-banner__icon {
-  font-size: 1.4rem;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--cr2-text);
+  font-size: 0.88rem;
+  font-weight: 800;
 }
 
 .cr2-econ-banner__label {
+  color: var(--cr2-text);
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .cr2-econ-banner__copy {
   color: var(--cr2-neutral);
+  font-size: 0.9rem;
+  line-height: 1.55;
 }

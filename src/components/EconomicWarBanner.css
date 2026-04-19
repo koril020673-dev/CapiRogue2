@@ -1,9 +1,11 @@
 .cr2-war-banner {
   display: grid;
-  gap: 12px;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--cr2-border);
-  background: color-mix(in srgb, var(--cr2-negative) 12%, var(--cr2-s1));
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(255, 107, 107, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 107, 107, 0.14), rgba(122, 35, 35, 0.08)),
+    var(--cr2-s1);
 }
 
 .cr2-war-banner__head,
@@ -18,18 +20,36 @@
   justify-content: space-between;
 }
 
+.cr2-war-banner__head strong {
+  color: rgba(255, 235, 235, 0.96);
+}
+
+.cr2-war-banner__head span,
+.cr2-war-banner__rival span {
+  color: rgba(240, 237, 232, 0.72);
+  white-space: nowrap;
+}
+
+.cr2-war-banner__bars {
+  flex-wrap: wrap;
+}
+
+.cr2-war-banner__rival {
+  flex: 1 1 240px;
+}
+
 .cr2-war-banner__track {
   flex: 1;
   height: 7px;
+  overflow: hidden;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
 }
 
 .cr2-war-banner__track span {
   display: block;
   height: 100%;
-  background: var(--cr2-negative);
+  background: linear-gradient(90deg, rgba(255, 179, 179, 0.86), var(--cr2-negative));
 }
 
 .cr2-war-banner__pause {

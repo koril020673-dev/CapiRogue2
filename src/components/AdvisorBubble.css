@@ -1,18 +1,36 @@
 .cr2-advisor-bubble {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: flex-start;
-  padding: 16px 18px;
-  border: 1px solid color-mix(in srgb, var(--cr2-advisor-color) 45%, var(--cr2-border));
-  border-radius: 20px;
-  background: color-mix(in srgb, var(--cr2-advisor-color) 8%, var(--cr2-s1));
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--cr2-advisor-color) 35%, rgba(255, 255, 255, 0.1));
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--cr2-advisor-color) 10%, transparent), transparent 65%),
+    rgba(20, 20, 28, 0.78);
+  backdrop-filter: blur(10px);
 }
 
 .cr2-advisor-bubble__icon {
-  font-size: 1.6rem;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cr2-advisor-color) 24%, rgba(255, 255, 255, 0.08));
+  font-size: 1.1rem;
 }
 
-.cr2-advisor-bubble p {
+.cr2-advisor-bubble__body {
+  display: grid;
+  gap: 4px;
+}
+
+.cr2-advisor-bubble__body strong {
+  color: var(--cr2-text);
+}
+
+.cr2-advisor-bubble__body p {
   color: var(--cr2-neutral);
-  line-height: 1.6;
+  line-height: 1.55;
 }

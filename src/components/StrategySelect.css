@@ -1,18 +1,23 @@
 .cr2-strategy-select {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .cr2-strategy-select__head {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .cr2-strategy-select__eyebrow {
-  color: var(--cr2-dim);
-  font-size: 0.82rem;
+  color: rgba(255, 214, 184, 0.72);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+}
+
+.cr2-strategy-select__head h2 {
+  color: rgba(255, 247, 239, 0.96);
+  font-size: 1.2rem;
 }
 
 .cr2-strategy-select__grid {
@@ -24,33 +29,59 @@
 .cr2-strategy-select__card {
   display: grid;
   gap: 8px;
-  padding: 18px;
-  border: 1px solid var(--cr2-border);
-  border-radius: 20px;
-  background: var(--cr2-s1);
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--cr2-strategy-accent) 12%, transparent), transparent 55%),
+    rgba(255, 255, 255, 0.04);
   color: var(--cr2-text);
   text-align: left;
   cursor: pointer;
   transition:
     transform 0.18s ease,
-    opacity 0.18s ease,
-    background 0.18s ease;
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .cr2-strategy-select__card:hover {
   transform: translateY(-2px);
+  box-shadow: 0 14px 22px rgba(0, 0, 0, 0.16);
 }
 
 .cr2-strategy-select__card[data-selected='true'] {
-  background: color-mix(in srgb, var(--cr2-s1) 78%, white);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--cr2-strategy-accent) 18%, transparent), transparent 58%),
+    rgba(255, 255, 255, 0.06);
 }
 
-.cr2-strategy-select__card[data-selected='false'] {
-  opacity: 0.9;
+.cr2-strategy-select__title-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
+.cr2-strategy-select__slot {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--cr2-text);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.cr2-strategy-select__card strong {
+  font-size: 1rem;
+}
+
+.cr2-strategy-select__card p,
 .cr2-strategy-select__card small {
   color: var(--cr2-neutral);
+  line-height: 1.55;
 }
 
 @media (max-width: 760px) {

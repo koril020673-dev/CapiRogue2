@@ -22,20 +22,20 @@ const RIVAL_DISPLAY_NAMES = {
 
 function getRivalStatus(rival) {
   if (!rival || rival.bankrupt || rival.eliminated) {
-    return '퇴출'
+    return { key: 'out', label: '퇴출' }
   }
 
   const ratio = rival.capital / Math.max(rival.initialCapital, 1)
   if (ratio >= 0.7 && rival.isAggressive) {
-    return '공세중'
+    return { key: 'attack', label: '공세중' }
   }
   if (ratio >= 0.5) {
-    return '관망중'
+    return { key: 'watch', label: '관망중' }
   }
   if (ratio > 0.2) {
-    return '위기'
+    return { key: 'crisis', label: '위기' }
   }
-  return '파산'
+  return { key: 'bankrupt', label: '파산' }
 }
 
 export function RivalPanel() {
@@ -59,21 +59,26 @@ export function RivalPanel() {
             <article
               key={rivalId}
               className="cr2-rival-panel__card"
-              data-out={status === '퇴출'}
+              data-rival={rivalId}
+              data-out={status.key === 'out'}
               style={{ '--cr2-rival-accent': definition.color }}
             >
               <div className="cr2-rival-panel__top">
                 <strong className="cr2-rival-panel__identity">
-                  <span className="cr2-rival-panel__logo-wrap">
+                  <span className="cr2-rival-panel__logo-wrap" data-rival={rivalId}>
+                    <span className="cr2-rival-panel__logo-glow" />
                     <img
                       className="cr2-rival-panel__logo"
+                      data-rival={rivalId}
                       src={RIVAL_LOGOS[rivalId]}
                       alt={`${RIVAL_DISPLAY_NAMES[rivalId]} 로고`}
                     />
                   </span>
-                  <span>{RIVAL_DISPLAY_NAMES[rivalId]}</span>
+                  <span className="cr2-rival-panel__name">{RIVAL_DISPLAY_NAMES[rivalId]}</span>
                 </strong>
-                <span>{status}</span>
+                <span className="cr2-rival-panel__badge" data-status={status.key}>
+                  {status.label}
+                </span>
               </div>
 
               <div className="cr2-rival-panel__bar">
