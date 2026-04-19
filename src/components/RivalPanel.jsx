@@ -1,6 +1,17 @@
 import './RivalPanel.css'
+import auraLogo from '../assets/rival-logos/aura.png'
+import megaflexLogo from '../assets/rival-logos/megaflex.png'
+import memecatchLogo from '../assets/rival-logos/memecatch.png'
+import nexuscoreLogo from '../assets/rival-logos/nexuscore.png'
 import { RIVAL_ORDER, RIVALS } from '../constants/rivals.js'
 import { useGameStore } from '../store/useGameStore.js'
+
+const RIVAL_LOGOS = {
+  megaflex: megaflexLogo,
+  aura: auraLogo,
+  memecatch: memecatchLogo,
+  nexuscore: nexuscoreLogo,
+}
 
 function getRivalStatus(rival) {
   if (!rival || rival.bankrupt || rival.eliminated) {
@@ -40,8 +51,15 @@ export function RivalPanel() {
           return (
             <article key={rivalId} className="cr2-rival-panel__card" data-out={status === '퇴출'}>
               <div className="cr2-rival-panel__top">
-                <strong>
-                  {definition.icon} {rival?.name ?? definition.name}
+                <strong className="cr2-rival-panel__identity">
+                  <span className="cr2-rival-panel__logo-wrap">
+                    <img
+                      className="cr2-rival-panel__logo"
+                      src={RIVAL_LOGOS[rivalId]}
+                      alt={`${rival?.name ?? definition.name} logo`}
+                    />
+                  </span>
+                  <span>{rival?.name ?? definition.name}</span>
                 </strong>
                 <span>{status}</span>
               </div>

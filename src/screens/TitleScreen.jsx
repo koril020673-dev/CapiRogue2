@@ -1,5 +1,5 @@
 import './TitleScreen.css'
-import startSceneImage from '../../startSceneImage/Gemini_Generated_Image_sbtadisbtadisbta.png'
+import startSceneImage from '../../startSceneImage/Gemini_Generated_Image_73czcg73czcg73cz.png'
 import { useGameStore } from '../store/useGameStore.js'
 
 function MenuButton({ disabled = false, label, sublabel, onClick }) {
