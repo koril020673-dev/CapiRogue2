@@ -8,7 +8,8 @@
   box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.2);
 }
 
-.cr2-side-panel__company {
+.cr2-side-panel__company,
+.cr2-side-panel__intel {
   display: grid;
   gap: 14px;
   padding: 18px;
@@ -33,7 +34,8 @@
   letter-spacing: 0.14em;
 }
 
-.cr2-side-panel__head h2 {
+.cr2-side-panel__head h2,
+.cr2-side-panel__head h3 {
   color: var(--cr2-text);
   font-size: 1.18rem;
 }
@@ -65,4 +67,85 @@
   margin: 0;
   color: var(--cr2-text);
   font-weight: 700;
+}
+
+.cr2-side-panel__money {
+  transition: color 0.22s ease, text-shadow 0.22s ease;
+}
+
+.cr2-side-panel__money[data-trend='up'] {
+  color: var(--cr2-positive);
+  text-shadow: 0 0 18px rgba(74, 222, 128, 0.18);
+}
+
+.cr2-side-panel__money[data-trend='down'] {
+  color: var(--cr2-negative);
+  text-shadow: 0 0 18px rgba(255, 107, 107, 0.14);
+}
+
+.cr2-side-panel__intel-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cr2-side-panel__intel-summary div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cr2-side-panel__intel-summary span {
+  color: var(--cr2-dim);
+  font-size: 0.8rem;
+}
+
+.cr2-side-panel__intel-summary strong {
+  color: var(--cr2-text);
+  font-size: 0.95rem;
+}
+
+.cr2-side-panel__intel-list {
+  display: grid;
+  gap: 10px;
+}
+
+.cr2-side-panel__intel-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cr2-side-panel__intel-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cr2-side-panel__intel-top strong {
+  color: var(--cr2-text);
+}
+
+.cr2-side-panel__intel-top span,
+.cr2-side-panel__intel-grid span {
+  color: var(--cr2-neutral);
+}
+
+.cr2-side-panel__intel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 1200px) {
+  .cr2-side-panel__intel-summary {
+    grid-template-columns: 1fr;
+  }
 }

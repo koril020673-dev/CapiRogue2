@@ -59,6 +59,13 @@ const FIXED_DIFFICULTY = {
   interestRate: 0.072,
 }
 
+const RIVAL_JOIN_TOAST = {
+  megaflex: '새 경쟁사의 그림자 · 메가플렉스가 저가 공세를 시작했습니다.',
+  aura: '시장 신호 감지 · 아우라가 프리미엄 전선에 합류했습니다.',
+  memecatch: '트렌드 급부상 · 밈캐치가 변칙 마케팅으로 난입했습니다.',
+  nexuscore: '기술 파고 접근 · 넥서스코어가 고급 시장에 진입했습니다.',
+}
+
 function createToast(message, tone = 'neutral') {
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
@@ -1033,6 +1040,11 @@ export const useGameStore = create((set, get) => {
         }
       }
 
+      const rivalsAfterJoin = ensureRivalsJoined(nextRivals, nextFloor, state.industryTier)
+      const joinedRivalIds = RIVAL_ORDER.filter(
+        (rivalId) => !nextRivals?.[rivalId]?.active && rivalsAfterJoin?.[rivalId]?.active,
+      )
+
       const draftState = {
         ...state,
         screen: 'game',
@@ -1042,7 +1054,7 @@ export const useGameStore = create((set, get) => {
         companyHealth,
         momentum: momentumState.momentum,
         momentumHistory: momentumState.momentumHistory,
-        rivals: ensureRivalsJoined(nextRivals, nextFloor, state.industryTier),
+        rivals: rivalsAfterJoin,
         activeEconomicWar: activeEconomicWar ?? maybeStartEconomicWar({ ...state, floor: nextFloor, rivals: nextRivals }),
         activeBlackSwan,
         blackSwanSeen,
@@ -1123,6 +1135,9 @@ export const useGameStore = create((set, get) => {
       const latestState = get()
       if (gameStatus === 'playing') {
         saveSaveSlot(buildSaveSnapshot(latestState))
+        joinedRivalIds.forEach((rivalId) => {
+          enqueueToast(RIVAL_JOIN_TOAST[rivalId] ?? '새 경쟁사가 시장에 진입했습니다.', 'warning')
+        })
       } else {
         clearSaveSlot()
         const playHistory = appendRunHistory(buildHistoryEntry(latestState, gameStatus))

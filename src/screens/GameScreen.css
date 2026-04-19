@@ -25,7 +25,7 @@
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-template-rows: auto 1fr auto;
-  min-height: 520px;
+  min-height: 560px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 30px;
@@ -51,7 +51,9 @@
 
 .cr2-game-screen__arena-backdrop,
 .cr2-game-screen__arena-scanlines,
-.cr2-game-screen__stage {
+.cr2-game-screen__stage,
+.cr2-game-screen__action-burst,
+.cr2-game-screen__signal-waves {
   position: absolute;
   inset: 0;
 }
@@ -79,7 +81,7 @@
 
 .cr2-game-screen__arena-overlay {
   position: relative;
-  z-index: 2;
+  z-index: 5;
   grid-column: 1 / -1;
   display: grid;
   gap: 10px;
@@ -89,7 +91,7 @@
 
 .cr2-game-screen__arena-hud {
   position: relative;
-  z-index: 2;
+  z-index: 5;
   display: grid;
   gap: 8px;
   width: min(360px, 100%);
@@ -161,9 +163,57 @@
   );
 }
 
+.cr2-game-screen__support-rivals {
+  position: relative;
+  z-index: 5;
+  grid-column: 8 / -1;
+  display: grid;
+  gap: 10px;
+  justify-self: end;
+  align-self: start;
+  margin: 148px 22px 0 0;
+}
+
+.cr2-game-screen__support-rival {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 180px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--cr2-rival-accent) 28%, rgba(255, 255, 255, 0.08));
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--cr2-rival-accent) 10%, transparent), transparent 66%),
+    rgba(18, 18, 26, 0.76);
+  backdrop-filter: blur(8px);
+}
+
+.cr2-game-screen__support-rival img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+  filter: contrast(1.04) brightness(0.92);
+}
+
+.cr2-game-screen__support-rival div {
+  display: grid;
+  gap: 2px;
+}
+
+.cr2-game-screen__support-rival strong {
+  color: var(--cr2-text);
+  font-size: 0.9rem;
+}
+
+.cr2-game-screen__support-rival span {
+  color: var(--cr2-neutral);
+  font-size: 0.82rem;
+}
+
 .cr2-game-screen__sprite {
   position: relative;
-  z-index: 2;
+  z-index: 4;
   align-self: end;
   justify-self: center;
 }
@@ -216,6 +266,23 @@
   mix-blend-mode: multiply;
 }
 
+.cr2-game-screen__sprite-caption {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  text-align: center;
+}
+
+.cr2-game-screen__sprite-caption strong {
+  color: rgba(255, 247, 239, 0.96);
+  font-size: 1rem;
+}
+
+.cr2-game-screen__sprite-caption span {
+  color: var(--cr2-neutral);
+  font-size: 0.86rem;
+}
+
 .cr2-game-screen__player-emblem {
   position: relative;
   display: grid;
@@ -239,8 +306,7 @@
   content: '';
   position: absolute;
   inset: 24px 22px 22px;
-  background:
-    linear-gradient(180deg, rgba(96, 67, 41, 0.98), rgba(74, 50, 31, 1));
+  background: linear-gradient(180deg, rgba(96, 67, 41, 0.98), rgba(74, 50, 31, 1));
   clip-path: polygon(50% 0, 94% 36%, 72% 100%, 28% 100%, 6% 36%);
 }
 
@@ -291,9 +357,93 @@
   bottom: 54px;
 }
 
+.cr2-game-screen__action-burst,
+.cr2-game-screen__signal-waves {
+  pointer-events: none;
+  z-index: 3;
+}
+
+.cr2-game-screen__action-burst span,
+.cr2-game-screen__signal-waves span {
+  position: absolute;
+  display: block;
+  opacity: 0;
+}
+
+.cr2-game-screen__action-burst span {
+  left: 24%;
+  top: 64%;
+  width: 220px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 214, 124, 0.88), rgba(255, 214, 124, 0));
+}
+
+.cr2-game-screen__action-burst span:nth-child(2) {
+  top: 60%;
+}
+
+.cr2-game-screen__action-burst span:nth-child(3) {
+  top: 68%;
+}
+
+.cr2-game-screen__signal-waves span {
+  left: 12%;
+  bottom: 22%;
+  width: 120px;
+  height: 120px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+}
+
+.cr2-game-screen__arena[data-strategy='volume'] .cr2-game-screen__action-burst span {
+  animation: cr2-rush-line 1.15s linear infinite;
+}
+
+.cr2-game-screen__arena[data-strategy='volume'] .cr2-game-screen__action-burst span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.cr2-game-screen__arena[data-strategy='volume'] .cr2-game-screen__action-burst span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+.cr2-game-screen__arena[data-strategy='quality'] .cr2-game-screen__sprite-badge,
+.cr2-game-screen__arena[data-strategy='quality'] .cr2-game-screen__player-emblem {
+  animation: cr2-quality-pulse 1.5s ease-in-out infinite;
+}
+
+.cr2-game-screen__arena[data-strategy='marketing'] .cr2-game-screen__signal-waves span {
+  animation: cr2-wave-broadcast 1.6s ease-out infinite;
+}
+
+.cr2-game-screen__arena[data-strategy='marketing'] .cr2-game-screen__signal-waves span:nth-child(2) {
+  animation-delay: 0.32s;
+}
+
+.cr2-game-screen__arena[data-strategy='marketing'] .cr2-game-screen__signal-waves span:nth-child(3) {
+  animation-delay: 0.64s;
+}
+
+.cr2-game-screen__arena[data-strategy='safe'] .cr2-game-screen__player-emblem {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 20px 34px rgba(0, 0, 0, 0.22),
+    0 0 0 12px rgba(148, 163, 184, 0.08);
+}
+
+.cr2-game-screen__arena[data-order='aggressive'] .cr2-game-screen__player-emblem,
+.cr2-game-screen__arena[data-order='aggressive'] .cr2-game-screen__sprite-badge {
+  transform: translateY(-4px);
+}
+
+.cr2-game-screen__arena[data-order='conservative'] .cr2-game-screen__support-rivals {
+  opacity: 0.86;
+}
+
 .cr2-game-screen__command-zone {
   display: grid;
-  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
+  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.22fr);
   gap: 14px;
 }
 
@@ -349,13 +499,90 @@
   background: rgba(240, 165, 0, 0.08);
 }
 
+.cr2-game-screen__action-feed {
+  display: grid;
+  gap: 10px;
+}
+
+.cr2-game-screen__action-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cr2-game-screen__action-item strong {
+  color: rgba(255, 247, 239, 0.95);
+}
+
+.cr2-game-screen__action-item span {
+  color: var(--cr2-neutral);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.cr2-game-screen__action-item[data-kind='strategy'] {
+  border-color: rgba(240, 165, 0, 0.24);
+}
+
+.cr2-game-screen__action-item[data-kind='order'] {
+  border-color: rgba(74, 222, 128, 0.2);
+}
+
+.cr2-game-screen__action-item[data-kind='event'] {
+  border-color: rgba(167, 139, 250, 0.24);
+}
+
 .cr2-game-screen__command-stack {
   display: grid;
   gap: 16px;
   padding: 18px;
 }
 
-@media (max-width: 1120px) {
+@keyframes cr2-rush-line {
+  0% {
+    opacity: 0;
+    transform: translateX(-36px) scaleX(0.35);
+  }
+  20% {
+    opacity: 0.88;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(320px) scaleX(1);
+  }
+}
+
+@keyframes cr2-quality-pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 24px 38px rgba(0, 0, 0, 0.18),
+      0 0 0 0 rgba(240, 165, 0, 0.12);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 24px 38px rgba(0, 0, 0, 0.18),
+      0 0 0 14px rgba(240, 165, 0, 0.08);
+  }
+}
+
+@keyframes cr2-wave-broadcast {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+@media (max-width: 1180px) {
   .cr2-game-screen__body {
     grid-template-columns: 1fr;
   }
@@ -365,9 +592,9 @@
   }
 }
 
-@media (max-width: 880px) {
+@media (max-width: 900px) {
   .cr2-game-screen__arena {
-    min-height: 620px;
+    min-height: 680px;
     grid-template-columns: repeat(8, minmax(0, 1fr));
   }
 
@@ -381,6 +608,12 @@
     margin-right: 14px;
   }
 
+  .cr2-game-screen__support-rivals {
+    grid-column: 5 / -1;
+    margin-top: 160px;
+    margin-right: 14px;
+  }
+
   .cr2-game-screen__sprite--enemy {
     grid-column: 5 / -1;
   }
@@ -388,10 +621,6 @@
   .cr2-game-screen__sprite--player {
     grid-column: 1 / span 4;
     margin-left: 22px;
-  }
-
-  .cr2-game-screen__stage-ring--enemy {
-    right: 58px;
   }
 }
 
@@ -401,7 +630,7 @@
   }
 
   .cr2-game-screen__arena {
-    min-height: 560px;
+    min-height: 620px;
     border-radius: 22px;
   }
 
@@ -418,6 +647,12 @@
     grid-column: 1 / -1;
     justify-self: stretch;
     margin: 0 12px;
+  }
+
+  .cr2-game-screen__support-rivals {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    margin: 164px 12px 0;
   }
 
   .cr2-game-screen__sprite--enemy {
