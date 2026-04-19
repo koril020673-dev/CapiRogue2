@@ -1,4 +1,5 @@
 import './TitleScreen.css'
+import startSceneImage from '../../startSceneImage/Gemini_Generated_Image_sbtadisbtadisbta.png'
 import { useGameStore } from '../store/useGameStore.js'
 
 function MenuButton({ disabled = false, label, sublabel, onClick }) {
@@ -24,13 +25,14 @@ export function TitleScreen() {
       <div className="cr2-title-scene__shell">
         <section className="cr2-title-scene__hero">
           <div className="cr2-title-scene__skyline">
-            <span className="cr2-title-scene__sun" />
-            <span className="cr2-title-scene__cloud cr2-title-scene__cloud--a" />
-            <span className="cr2-title-scene__cloud cr2-title-scene__cloud--b" />
-            <span className="cr2-title-scene__cloud cr2-title-scene__cloud--c" />
-            <span className="cr2-title-scene__ridge cr2-title-scene__ridge--far" />
-            <span className="cr2-title-scene__ridge cr2-title-scene__ridge--mid" />
-            <span className="cr2-title-scene__ridge cr2-title-scene__ridge--near" />
+            <img
+              className="cr2-title-scene__skyline-image"
+              src={startSceneImage}
+              alt="CapiRogue 2 opening scene"
+            />
+            <span className="cr2-title-scene__skyline-shade" />
+            <span className="cr2-title-scene__skyline-glow" />
+            <span className="cr2-title-scene__skyline-frame" />
           </div>
 
           <div className="cr2-title-scene__brand">

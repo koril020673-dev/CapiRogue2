@@ -62,131 +62,54 @@
   position: relative;
   overflow: hidden;
   border-radius: 24px;
+  isolation: isolate;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04) 34%, rgba(54, 45, 62, 0.3) 100%),
-    linear-gradient(180deg, #bedae5 0%, #9cc6d4 38%, #e4b98a 75%, #c49c6e 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04) 34%, rgba(54, 45, 62, 0.2) 100%),
+    rgba(18, 16, 24, 0.22);
   min-height: 360px;
 }
 
-.cr2-title-scene__sun {
+.cr2-title-scene__skyline-image,
+.cr2-title-scene__skyline-shade,
+.cr2-title-scene__skyline-glow,
+.cr2-title-scene__skyline-frame {
   position: absolute;
-  left: 16%;
-  top: 14%;
-  width: 128px;
-  height: 128px;
-  border-radius: 999px;
+  inset: 0;
+}
+
+.cr2-title-scene__skyline-image {
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+
+.cr2-title-scene__skyline-shade {
+  z-index: 1;
   background:
-    radial-gradient(circle, rgba(255, 248, 236, 0.98) 0%, rgba(255, 228, 179, 0.88) 36%, rgba(228, 185, 138, 0) 72%);
-  filter: blur(1px);
+    linear-gradient(180deg, rgba(255, 251, 243, 0.16), transparent 22%),
+    linear-gradient(180deg, rgba(15, 15, 20, 0), rgba(15, 15, 20, 0.1) 60%, rgba(15, 15, 20, 0.24) 100%);
 }
 
-.cr2-title-scene__cloud {
-  position: absolute;
-  height: 34px;
-  border-radius: 999px;
-  background: rgba(244, 250, 252, 0.62);
-  filter: blur(8px);
-  opacity: 0.88;
-}
-
-.cr2-title-scene__cloud::before,
-.cr2-title-scene__cloud::after {
-  content: '';
-  position: absolute;
-  border-radius: 999px;
-  background: inherit;
-}
-
-.cr2-title-scene__cloud--a {
-  top: 16%;
-  left: 38%;
-  width: 168px;
-}
-
-.cr2-title-scene__cloud--a::before {
-  width: 82px;
-  height: 42px;
-  left: 18px;
-  top: -12px;
-}
-
-.cr2-title-scene__cloud--a::after {
-  width: 58px;
-  height: 34px;
-  right: 22px;
-  top: -8px;
-}
-
-.cr2-title-scene__cloud--b {
-  top: 28%;
-  right: 10%;
-  width: 142px;
-}
-
-.cr2-title-scene__cloud--b::before {
-  width: 68px;
-  height: 36px;
-  left: 12px;
-  top: -10px;
-}
-
-.cr2-title-scene__cloud--b::after {
-  width: 52px;
-  height: 30px;
-  right: 16px;
-  top: -6px;
-}
-
-.cr2-title-scene__cloud--c {
-  top: 42%;
-  left: 14%;
-  width: 132px;
-  opacity: 0.55;
-}
-
-.cr2-title-scene__cloud--c::before {
-  width: 60px;
-  height: 32px;
-  left: 10px;
-  top: -8px;
-}
-
-.cr2-title-scene__cloud--c::after {
-  width: 46px;
-  height: 28px;
-  right: 12px;
-  top: -5px;
-}
-
-.cr2-title-scene__ridge {
-  position: absolute;
-  inset: auto 0 0;
-  background-repeat: no-repeat;
-}
-
-.cr2-title-scene__ridge--far {
-  height: 36%;
+.cr2-title-scene__skyline-glow {
+  z-index: 2;
   background:
-    radial-gradient(circle at 20% 140%, rgba(255, 255, 255, 0.12), transparent 26%),
-    linear-gradient(180deg, rgba(72, 64, 80, 0.1), rgba(72, 64, 80, 0.66)),
-    #6f625f;
-  clip-path: polygon(0 48%, 14% 38%, 24% 44%, 34% 28%, 46% 42%, 58% 34%, 71% 52%, 85% 30%, 100% 44%, 100% 100%, 0 100%);
+    radial-gradient(circle at 18% 16%, rgba(255, 241, 220, 0.3), transparent 18%),
+    radial-gradient(circle at 80% 84%, rgba(54, 45, 62, 0.24), transparent 22%);
+  mix-blend-mode: screen;
+  pointer-events: none;
 }
 
-.cr2-title-scene__ridge--mid {
-  height: 28%;
-  background:
-    linear-gradient(180deg, rgba(208, 166, 120, 0.22), rgba(54, 45, 62, 0.74)),
-    #534555;
-  clip-path: polygon(0 56%, 12% 42%, 24% 58%, 35% 34%, 48% 54%, 62% 40%, 76% 60%, 89% 46%, 100% 62%, 100% 100%, 0 100%);
-}
-
-.cr2-title-scene__ridge--near {
-  height: 22%;
-  background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(24, 24, 24, 0.9)),
-    #181818;
-  clip-path: polygon(0 64%, 16% 52%, 28% 70%, 43% 48%, 58% 68%, 72% 54%, 86% 72%, 100% 60%, 100% 100%, 0 100%);
+.cr2-title-scene__skyline-frame {
+  z-index: 3;
+  inset: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -60px 80px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
 }
 
 .cr2-title-scene__brand {
