@@ -9,7 +9,11 @@ function avgRange(rangeOrNumber, fallback = 0) {
     return rangeOrNumber
   }
 
-  if (!rangeOrNumber || typeof rangeOrNumber.min !== 'number' || typeof rangeOrNumber.max !== 'number') {
+  if (
+    !rangeOrNumber ||
+    typeof rangeOrNumber.min !== 'number' ||
+    typeof rangeOrNumber.max !== 'number'
+  ) {
     return fallback
   }
 

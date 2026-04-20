@@ -89,8 +89,8 @@ export function MarketStatusScreen() {
               <span>{Number(rival.marketShare ?? 0).toFixed(1)}%</span>
             </div>
           ))}
-          {activeRivals.length === 0 ? (
-            <div className="cr2-market-screen__empty">현재 표시할 라이벌이 없습니다.</div>
+          {!activeRivals.length ? (
+            <div className="cr2-market-screen__empty">현재 시장에 노출된 라이벌이 없습니다.</div>
           ) : null}
         </div>
       </section>

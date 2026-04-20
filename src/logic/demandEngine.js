@@ -94,6 +94,17 @@ export function calcDemandEstimate({
   return Math.round(BASE_DEMAND * ecoWeight * tierMul * momentumMul * blackSwanMul * eventMul)
 }
 
+export function getDemandEstimate(state = {}) {
+  return calcDemandEstimate({
+    category: state.itemCategory ?? 'normal',
+    econPhase: state.econPhase ?? 'stable',
+    industryTier: state.industryTier ?? 1,
+    momentumMul: state.momentumMul ?? 1,
+    blackSwanMul: state.blackSwanMul ?? 1,
+    eventMul: state.eventMul ?? 1,
+  })
+}
+
 export function calcGroupDemandBreakdown({
   econPhase,
   totalDemand,

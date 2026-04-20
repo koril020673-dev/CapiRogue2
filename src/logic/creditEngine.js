@@ -16,6 +16,10 @@ export function getFloorCreditMultiplier(floor = 1) {
   return CREDIT_PRICE_MUL.final
 }
 
+export function getPrice(basePrice, floor) {
+  return Math.round(basePrice * getFloorCreditMultiplier(floor))
+}
+
 export function getCreditShopPrice(baseCost, floor) {
-  return Math.round(baseCost * getFloorCreditMultiplier(floor))
+  return getPrice(baseCost, floor)
 }

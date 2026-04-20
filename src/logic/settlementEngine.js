@@ -1,3 +1,5 @@
+import { VENDOR } from '../constants/strategies.js'
+
 const QUALITY_MUL = {
   budget: 0.8,
   standard: 1,
@@ -5,6 +7,36 @@ const QUALITY_MUL = {
 }
 
 const FACTORY_DISCOUNT = 0.6
+
+export function getOrderOptions(strategy, demandEstimate) {
+  if (!strategy) {
+    return {
+      conservative: { qty: 0, prepay: 0 },
+      standard: { qty: 0, prepay: 0 },
+      aggressive: { qty: 0, prepay: 0 },
+    }
+  }
+
+  const [minMul, maxMul] = strategy.orderRange
+  const midMul = (minMul + maxMul) / 2
+
+  const calcPrepay = (qty) => qty * VENDOR.baseUnitCost
+
+  return {
+    conservative: {
+      qty: Math.round(demandEstimate * minMul),
+      prepay: calcPrepay(Math.round(demandEstimate * minMul)),
+    },
+    standard: {
+      qty: Math.round(demandEstimate * midMul),
+      prepay: calcPrepay(Math.round(demandEstimate * midMul)),
+    },
+    aggressive: {
+      qty: Math.round(demandEstimate * maxMul),
+      prepay: calcPrepay(Math.round(demandEstimate * maxMul)),
+    },
+  }
+}
 
 export function calcSettlement({
   sellPrice,

@@ -1,247 +1,181 @@
 import { useEffect, useMemo, useState } from 'react'
 import './ShopScreen.css'
-import { getAdvisorPhaseComment } from '../constants/advisors.js'
-import { CREDIT_SHOP } from '../constants/rewards.js'
-import { getCreditShopPrice } from '../logic/creditEngine.js'
+import { GRADE_LABEL, CREDIT_SHOP_ITEMS } from '../constants/rewards.js'
+import { getAdvisorBriefing } from '../logic/advisorBriefingEngine.js'
+import { getPrice } from '../logic/creditEngine.js'
 import { useGameStore } from '../store/useGameStore.js'
 
-function getGradeChip(grade) {
-  switch (grade) {
-    case 'legend':
-      return '🟨 전설'
-    case 'epic':
-      return '🟪 고급'
-    case 'rare':
-      return '🟦 희귀'
-    default:
-      return '⬜ 일반'
-  }
-}
-
-function formatMoney(value) {
+function fmt(value) {
   return `${Math.round(value ?? 0).toLocaleString()}원`
-}
-
-function buildStaticBriefing({ advisor, econPhase, consumerGroupRatios }) {
-  const advisorLine = getAdvisorPhaseComment(advisor, econPhase)
-  const valueRatio = Math.round((consumerGroupRatios?.value ?? 0) * 100)
-
-  let recommendation = '브랜드와 품질의 균형을 유지하세요.'
-  if (valueRatio >= 35) {
-    recommendation = '가성비 수요가 높아 박리다매 또는 안전 경영이 유리합니다.'
-  } else if ((consumerGroupRatios?.quality ?? 0) >= 0.25) {
-    recommendation = '품질 수요가 두꺼워 품질 확보 전략이 통할 수 있습니다.'
-  } else if ((consumerGroupRatios?.brand ?? 0) >= 0.25) {
-    recommendation = '브랜드 소비자가 많은 구간이라 브랜딩 투자 효율이 좋습니다.'
-  }
-
-  return `${advisorLine} 가성비 수요 ${valueRatio}% 구간으로 ${recommendation}`
 }
 
 export function ShopScreen() {
   const floorStage = useGameStore((state) => state.floorStage)
   const floor = useGameStore((state) => state.floor)
   const credits = useGameStore((state) => state.credits)
+  const advisor = useGameStore((state) => state.advisor)
+  const econPhase = useGameStore((state) => state.econPhase)
+  const rivals = useGameStore((state) => state.rivals)
   const capital = useGameStore((state) => state.capital)
   const debt = useGameStore((state) => state.debt)
-  const companyHealth = useGameStore((state) => state.companyHealth)
-  const maxHealth = useGameStore((state) => state.maxHealth)
-  const momentum = useGameStore((state) => state.momentum)
   const brandValue = useGameStore((state) => state.brandValue)
   const qualityScore = useGameStore((state) => state.qualityScore)
-  const econPhase = useGameStore((state) => state.econPhase)
-  const advisor = useGameStore((state) => state.advisor)
-  const consumerGroupRatios = useGameStore((state) => state.consumerGroupRatios)
+  const companyHealth = useGameStore((state) => state.companyHealth)
   const lastSettlement = useGameStore((state) => state.lastSettlement)
-  const rewardPending = useGameStore((state) => state.rewardPending)
+  const currentRewards = useGameStore((state) => state.currentRewards)
   const rewardSelection = useGameStore((state) => state.rewardSelection)
-  const rewardClaimed = useGameStore((state) => state.rewardClaimed)
   const shopPurchasesThisFloor = useGameStore((state) => state.shopPurchasesThisFloor)
+  const generateFloorRewards = useGameStore((state) => state.generateFloorRewards)
   const selectReward = useGameStore((state) => state.selectReward)
-  const claimReward = useGameStore((state) => state.claimReward)
-  const buyShopItem = useGameStore((state) => state.buyShopItem)
+  const buyItem = useGameStore((state) => state.buyItem)
   const continueFromShop = useGameStore((state) => state.continueFromShop)
 
-  const [aiBriefing, setAiBriefing] = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
+  const [briefingOpen, setBriefingOpen] = useState(false)
 
   useEffect(() => {
-    if (floorStage === 'shop') {
-      setAiBriefing('')
-      setAiLoading(false)
+    if (floorStage === 'shop' && currentRewards.length === 0) {
+      generateFloorRewards()
     }
-  }, [floorStage, floor])
+  }, [currentRewards.length, floorStage, generateFloorRewards])
 
-  const staticBriefing = useMemo(
-    () =>
-      buildStaticBriefing({
-        advisor,
-        econPhase,
-        consumerGroupRatios,
-      }),
-    [advisor, consumerGroupRatios, econPhase],
+  const activeRivals = useMemo(
+    () => rivals.filter((rival) => rival.active && !rival.bankrupt && !rival.eliminated),
+    [rivals],
   )
 
-  if (floorStage !== 'shop' || !rewardPending) {
+  const briefing = useMemo(
+    () => getAdvisorBriefing(advisor, econPhase, activeRivals),
+    [activeRivals, advisor, econPhase],
+  )
+
+  if (floorStage !== 'shop') {
     return null
   }
 
-  const requestAiBriefing = async () => {
-    if (aiLoading) {
-      return
-    }
-
-    setAiLoading(true)
-    try {
-      const response = await fetch('/api/deepseek', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: [
-            'CapiRogue2 advisor briefing.',
-            `Advisor: ${advisor}`,
-            `Floor: ${floor}`,
-            `Economy: ${econPhase}`,
-            `Capital: ${capital}`,
-            `Debt: ${debt}`,
-            `Momentum: ${momentum}`,
-            `Brand: ${brandValue}`,
-            `Quality: ${qualityScore}`,
-            `Market share: ${((lastSettlement?.myShare ?? 0) * 100).toFixed(1)}%`,
-            `Consumer ratios: ${JSON.stringify(consumerGroupRatios)}`,
-            'Return 2 concise Korean sentences with a tactical recommendation.',
-          ].join('\n'),
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('briefing_failed')
-      }
-
-      const data = await response.json()
-      const content =
-        data.reply ??
-        data.content ??
-        data.message ??
-        data.output_text ??
-        'AI 브리핑을 불러오지 못했습니다.'
-      setAiBriefing(String(content))
-    } catch {
-      setAiBriefing('AI 브리핑을 불러오지 못했습니다. 현재는 정적 브리핑을 참고해주세요.')
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
   return (
-    <section className="cr2-shop-screen cr2-game__panel">
-      <div className="cr2-shop-screen__head">
-        <div>
-          <p className="cr2-shop-screen__eyebrow">Floor {floor - 1}</p>
-          <h2>보상 & 상점</h2>
-        </div>
-        <span className="cr2-shop-screen__credits">🔷 {credits}C 보유</span>
+    <section className="cr2-shop cr2-game__panel">
+      <div className="cr2-shop-header">
+        <span>🔷 {credits}C</span>
+        <span>Floor {floor} 보상</span>
       </div>
 
-      <section className="cr2-shop-screen__section">
-        <div className="cr2-shop-screen__section-head">
-          <h3>Credit 아이템</h3>
-          <span>각 아이템은 이번 층 1회 구매 가능</span>
-        </div>
+      <div className="cr2-shop-credit-row">
+        {CREDIT_SHOP_ITEMS.map((item) => {
+          const price = getPrice(item.baseCost, floor)
+          const done = shopPurchasesThisFloor.includes(item.id)
 
-        <div className="cr2-shop-screen__shop-grid">
-          {CREDIT_SHOP.map((item) => {
-            const price = getCreditShopPrice(item.baseCost, floor)
-            const purchased = shopPurchasesThisFloor.includes(item.id)
-            const disabled = credits < price || purchased
-
-            return (
-              <article key={item.id} className="cr2-shop-screen__shop-card" data-disabled={disabled}>
-                <strong>{item.label}</strong>
-                <span>{price}C</span>
-                <button type="button" disabled={disabled} onClick={() => buyShopItem(item.id)}>
-                  {purchased ? '구매 완료' : '구매'}
-                </button>
-              </article>
-            )
-          })}
-        </div>
-      </section>
-
-      <section className="cr2-shop-screen__section">
-        <div className="cr2-shop-screen__section-head">
-          <h3>이번 층 랜덤 보상</h3>
-          <span>
-            {getGradeChip(rewardPending.grade)} + 기본 Credit {rewardPending.credits}C
-          </span>
-        </div>
-
-        <div className="cr2-shop-screen__reward-grid">
-          {rewardPending.options.map((option) => (
-            <article
-              key={option.id}
-              className="cr2-shop-screen__reward-card"
-              data-selected={rewardSelection === option.id}
-              data-claimed={rewardClaimed}
-            >
-              <div className="cr2-shop-screen__reward-chip">{getGradeChip(rewardPending.grade)}</div>
-              <strong>{option.label}</strong>
-              <button type="button" disabled={rewardClaimed} onClick={() => selectReward(option.id)}>
-                선택
+          return (
+            <article key={item.id} className="cr2-credit-item" data-done={done}>
+              <span className="cr2-credit-item-icon">{item.icon}</span>
+              <span className="cr2-credit-item-name">{item.label}</span>
+              <span className="cr2-credit-item-cost">{price}C</span>
+              <button
+                type="button"
+                disabled={credits < price || done}
+                onClick={() => buyItem(item.id)}
+              >
+                {done ? '완료' : '구매'}
               </button>
             </article>
-          ))}
-        </div>
+          )
+        })}
+      </div>
 
-        <div className="cr2-shop-screen__reward-actions">
+      <div className="cr2-shop-reward-row">
+        {currentRewards.map((reward) => (
+          <article
+            key={reward.id}
+            className="cr2-reward-card"
+            data-grade={reward.grade}
+            data-selected={rewardSelection === reward.id}
+            onClick={() => selectReward(reward.id)}
+          >
+            <span className="cr2-reward-icon">{reward.icon}</span>
+            <span className="cr2-reward-grade" data-grade={reward.grade}>
+              {GRADE_LABEL[reward.grade]}
+            </span>
+            <span className="cr2-reward-name">{reward.label}</span>
+            <span className="cr2-reward-effect">{reward.effectText}</span>
+          </article>
+        ))}
+      </div>
+
+      {!briefingOpen ? (
+        <div className="cr2-shop-footer">
+          <button type="button" className="cr2-btn-secondary" onClick={() => setBriefingOpen(true)}>
+            현상황
+          </button>
           <button
             type="button"
-            className="cr2-shop-screen__claim"
-            disabled={!rewardSelection || rewardClaimed}
-            onClick={claimReward}
+            className="cr2-btn-primary"
+            disabled={!rewardSelection}
+            onClick={continueFromShop}
           >
-            보상 확정
+            보상 확정 →
           </button>
         </div>
-      </section>
+      ) : null}
 
-      <section className="cr2-shop-screen__section">
-        <div className="cr2-shop-screen__section-head">
-          <h3>어드바이저 브리핑</h3>
-          <button type="button" className="cr2-shop-screen__briefing-btn" onClick={requestAiBriefing}>
-            {aiLoading ? '브리핑 생성 중...' : '브리핑 더 보기 (AI)'}
-          </button>
-        </div>
-        <div className="cr2-shop-screen__briefing">
-          <p>{staticBriefing}</p>
-          {aiBriefing ? <p className="cr2-shop-screen__briefing-ai">{aiBriefing}</p> : null}
-        </div>
-      </section>
+      {briefingOpen ? (
+        <div className="cr2-briefing-panel">
+          <div className="cr2-briefing-summary">
+            <span>📊</span>
+            <p>{briefing}</p>
+          </div>
 
-      <section className="cr2-shop-screen__section">
-        <div className="cr2-shop-screen__section-head">
-          <h3>현재 상태 요약</h3>
-        </div>
-        <div className="cr2-shop-screen__summary">
-          <span>현금 {formatMoney(capital)}</span>
-          <span>부채 {formatMoney(debt)}</span>
-          <span>
-            체력 {companyHealth}/{maxHealth}
-          </span>
-          <span>모멘텀 {momentum >= 0 ? `+${momentum}` : momentum}</span>
-          <span>점유율 {((lastSettlement?.myShare ?? 0) * 100).toFixed(1)}%</span>
-          <span>브랜드 {Math.round(brandValue)}</span>
-          <span>품질 {Math.round(qualityScore)}</span>
-        </div>
-      </section>
+          <div className="cr2-briefing-body">
+            <div className="cr2-briefing-rivals">
+              <p className="cr2-briefing-col-title">라이벌 전략</p>
+              {activeRivals.length ? (
+                activeRivals.map((rival) => (
+                  <div key={rival.id} className="cr2-briefing-rival-row">
+                    <span>
+                      {rival.name} ({rival.tier}단계)
+                    </span>
+                    <span>→ {rival.strategyLabel}</span>
+                    <span>{rival.sellPrice?.toLocaleString()}원</span>
+                    <span>{Number(rival.marketShare ?? 0).toFixed(1)}%</span>
+                  </div>
+                ))
+              ) : (
+                <div className="cr2-briefing-empty">현재 표시할 라이벌 정보가 없습니다.</div>
+              )}
+            </div>
 
-      <div className="cr2-shop-screen__footer">
-        <button type="button" disabled={!rewardClaimed} onClick={continueFromShop}>
-          다음 층으로 →
-        </button>
-      </div>
+            <div className="cr2-briefing-company">
+              <p className="cr2-briefing-col-title">내 회사 상황</p>
+              {[
+                ['현금', fmt(capital)],
+                ['부채', fmt(debt)],
+                ['브랜드', `${Math.round(brandValue)}pt`],
+                ['품질', `${Math.round(qualityScore)}pt`],
+                ['점유율', `${((lastSettlement?.myShare ?? 0) * 100).toFixed(1)}%`],
+              ].map(([label, value]) => (
+                <div key={label} className="cr2-briefing-stat-row">
+                  <span>{label}</span>
+                  <span>{value}</span>
+                </div>
+              ))}
+
+              <div className="cr2-briefing-health">
+                {Array.from({ length: 10 }, (_, index) => (
+                  <div key={index} className="cr2-health-pip" data-filled={index < companyHealth} />
+                ))}
+                <span>{companyHealth}/10</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="cr2-briefing-footer">
+            <button type="button" className="cr2-btn-secondary" onClick={() => setBriefingOpen(false)}>
+              현상황 닫기
+            </button>
+            <button type="button" className="cr2-btn-ghost" onClick={() => setBriefingOpen(false)}>
+              돌아가기 ↩
+            </button>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }

@@ -17,7 +17,7 @@ function getMomentumArrows(momentumHistory = []) {
 export function SettlementModal() {
   const floorStage = useGameStore((state) => state.floorStage)
   const settlement = useGameStore((state) => state.lastSettlement)
-  const closeSettlementModal = useGameStore((state) => state.closeSettlementModal)
+  const advanceToShop = useGameStore((state) => state.advanceToShop)
 
   if (floorStage !== 'settlement' || !settlement) {
     return null
@@ -65,7 +65,7 @@ export function SettlementModal() {
           ) : null}
           {settlement.leftoverDemand > 0 && settlement.biggestRival ? (
             <span className="cr2-settlement-modal__leftover">
-              📦 미판매 수요 {settlement.leftoverDemand}개 → {settlement.biggestRival.name}이 가져갔습니다
+              📦 미판매 수요 {settlement.leftoverDemand}개 → {settlement.biggestRival.name}이 가져갔습니다 (+{settlement.leftoverDemand}개)
             </span>
           ) : null}
           <span>점유율 {(settlement.myShare * 100).toFixed(1)}%</span>
@@ -79,10 +79,12 @@ export function SettlementModal() {
             모멘텀 {getMomentumArrows(settlement.momentumHistory)}{' '}
             {settlement.momentum >= 0 ? `+${settlement.momentum}` : settlement.momentum}
           </span>
-          {settlement.educationHint ? <span className="cr2-settlement-modal__hint">💡 {settlement.educationHint}</span> : null}
+          {settlement.educationHint ? (
+            <span className="cr2-settlement-modal__hint">💡 {settlement.educationHint}</span>
+          ) : null}
         </div>
 
-        <button type="button" className="cr2-settlement-modal__next" onClick={closeSettlementModal}>
+        <button type="button" className="cr2-settlement-modal__next" onClick={advanceToShop}>
           확인
         </button>
       </div>

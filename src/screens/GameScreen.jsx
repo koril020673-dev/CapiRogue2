@@ -36,7 +36,7 @@ function StrategyStageScreen() {
             <h3>전략과 결재를 먼저 확정합니다</h3>
             <p>
               전략을 고른 뒤 이번 달 문서 카드를 처리하면 확인 단계로 넘어갑니다.
-              발주량은 다음 단계에서 최종 결정합니다.
+              발주량은 다음 단계에서 최종 결정됩니다.
             </p>
           </section>
 
@@ -45,8 +45,8 @@ function StrategyStageScreen() {
             <h3>{selectedStrategyId ? '전략 선택 완료' : '전략 미선택'}</h3>
             <p>
               {selectedStrategyId
-                ? '이제 이벤트 카드에서 대응안을 고르세요.'
-                : '먼저 네 가지 전략 중 하나를 선택하세요.'}
+                ? '이제 이벤트 카드에서 대응안을 골라 주세요.'
+                : '먼저 네 가지 전략 중 하나를 선택해 주세요.'}
             </p>
           </section>
         </aside>

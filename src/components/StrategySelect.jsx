@@ -11,11 +11,11 @@ function getStrategySummary(strategyId) {
 
   switch (strategyId) {
     case 'quality':
-      return '품질 상승, 브랜드 일부 하락, 발주 상한 20% 감소'
+      return '품질 상승, 브랜드 하락, 발주 상한 20% 감소'
     case 'branding':
-      return '브랜드 상승, 비용 증가, 판매 기준선 완만 상승'
+      return '브랜드 상승, 비용 증가, 판매 기준가 상승'
     case 'dumping':
-      return '가격 25% 인하, 가성비 수요 강화, 브랜드·품질 하락'
+      return '판매가 25% 인하, 가성비 수요 강화, 브랜드·품질 하락'
     case 'safe':
       return '추가 비용 없이 현상 유지, 체력 손실 조건 완화'
     default:

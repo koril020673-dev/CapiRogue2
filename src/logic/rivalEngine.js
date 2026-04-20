@@ -107,11 +107,12 @@ export function updateRivalsFromSettlement({
     const nextCapital = Math.max(0, rival.capital + revenue - variableCost - fixedCost)
     const ratio = nextCapital / Math.max(rival.initialCapital, 1)
     const bankrupt = nextCapital <= 0
+    const nextPrice = clamp(getPriceTarget(rival, playerPrice), 18000, 220000)
 
     return {
       ...rival,
-      currentPrice: clamp(getPriceTarget(rival, playerPrice), 18000, 220000),
-      sellPrice: clamp(getPriceTarget(rival, playerPrice), 18000, 220000),
+      currentPrice: nextPrice,
+      sellPrice: nextPrice,
       capital: nextCapital,
       marketShare: totalDemand > 0 ? roundTo((soldUnits / totalDemand) * 100, 1) : rival.marketShare,
       health: clamp(ratio, 0, 1),

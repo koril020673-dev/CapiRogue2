@@ -4,8 +4,9 @@ import { STRATEGIES } from '../constants/strategies.js'
 import { useGameStore } from '../store/useGameStore.js'
 
 function formatMoney(value) {
-  const sign = value > 0 ? '+' : value < 0 ? '' : ''
-  return `${sign}${Math.round(value ?? 0).toLocaleString()}원`
+  const numeric = Math.round(value ?? 0)
+  const prefix = numeric > 0 ? '+' : ''
+  return `${prefix}${numeric.toLocaleString()}원`
 }
 
 export function StrategyConfirmScreen() {
@@ -23,7 +24,7 @@ export function StrategyConfirmScreen() {
     return (
       <section className="cr2-confirm-screen cr2-game__panel">
         <div className="cr2-confirm-screen__fallback">
-          <h2>먼저 전략을 선택해주세요</h2>
+          <h2>먼저 전략을 선택해 주세요</h2>
           <button type="button" onClick={returnToStrategyStage}>
             전략 화면으로 돌아가기
           </button>
@@ -63,7 +64,7 @@ export function StrategyConfirmScreen() {
           </div>
         ) : (
           <div className="cr2-confirm-screen__preview-empty">
-            전략 미리보기 Credit를 사용하지 않아 예측값은 숨겨져 있습니다.
+            전략 미리보기 Credit을 사용하지 않아 예측값이 잠겨 있습니다.
           </div>
         )}
       </section>
@@ -77,14 +78,14 @@ export function StrategyConfirmScreen() {
             disabled={!selectedOrderTier}
             onClick={confirmTurn}
           >
-            Y — 정산 시작
+            Y - 정산 시작
           </button>
           <button
             type="button"
             className="cr2-confirm-screen__action"
             onClick={returnToStrategyStage}
           >
-            N — 다시 선택
+            N - 다시 선택
           </button>
         </div>
       </section>

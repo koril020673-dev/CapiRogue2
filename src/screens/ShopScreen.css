@@ -1,181 +1,263 @@
-.cr2-shop-screen {
+.cr2-shop {
+  position: relative;
   display: grid;
-  gap: 20px;
+  gap: 18px;
 }
 
-.cr2-shop-screen__head,
-.cr2-shop-screen__section-head,
-.cr2-shop-screen__footer {
+.cr2-shop-header,
+.cr2-shop-footer,
+.cr2-briefing-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.cr2-shop-screen__eyebrow {
-  color: var(--cr2-dim);
-  font-size: 0.82rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.cr2-shop-screen__head h2,
-.cr2-shop-screen__section h3 {
+.cr2-shop-header {
+  padding: 14px 18px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 18px;
+  background: var(--cr2-s2);
   color: var(--cr2-text);
-}
-
-.cr2-shop-screen__credits {
-  padding: 10px 14px;
-  border-radius: 999px;
-  background: rgba(240, 165, 0, 0.12);
-  color: var(--cr2-accent);
   font-weight: 700;
 }
 
-.cr2-shop-screen__section {
+.cr2-shop-credit-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.cr2-credit-item {
+  min-width: 150px;
   display: grid;
-  gap: 14px;
-  padding: 18px 20px;
+  gap: 8px;
+  padding: 14px;
   border: 1px solid var(--cr2-border);
-  border-radius: 22px;
+  border-radius: 18px;
   background: var(--cr2-s2);
 }
 
-.cr2-shop-screen__section-head span {
-  color: var(--cr2-neutral);
-  font-size: 0.9rem;
+.cr2-credit-item[data-done='true'] {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
-.cr2-shop-screen__shop-grid {
+.cr2-credit-item-icon {
+  font-size: 1.3rem;
+}
+
+.cr2-credit-item-name {
+  color: var(--cr2-text);
+  font-weight: 700;
+}
+
+.cr2-credit-item-cost {
+  color: var(--cr2-neutral);
+  font-size: 0.92rem;
+}
+
+.cr2-credit-item button,
+.cr2-shop-footer button,
+.cr2-briefing-footer button {
+  padding: 11px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--cr2-border);
+  color: var(--cr2-text);
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cr2-credit-item button:disabled,
+.cr2-shop-footer button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cr2-shop-reward-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
-.cr2-shop-screen__shop-card,
-.cr2-shop-screen__reward-card {
+.cr2-reward-card {
   display: grid;
   gap: 10px;
-  padding: 16px;
+  padding: 18px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 22px;
+  background: var(--cr2-s2);
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.cr2-reward-card:hover {
+  transform: translateY(-2px);
+}
+
+.cr2-reward-card[data-selected='true'] {
+  border-color: var(--cr2-accent);
+  box-shadow: 0 0 12px rgba(240, 165, 0, 0.25);
+}
+
+.cr2-reward-icon {
+  font-size: 1.5rem;
+}
+
+.cr2-reward-grade {
+  font-weight: 700;
+}
+
+.cr2-reward-grade[data-grade='normal'] {
+  color: var(--cr2-neutral);
+}
+
+.cr2-reward-grade[data-grade='rare'] {
+  color: #60a5fa;
+}
+
+.cr2-reward-grade[data-grade='epic'] {
+  color: var(--cr2-purple);
+}
+
+.cr2-reward-grade[data-grade='legend'] {
+  color: var(--cr2-accent);
+}
+
+.cr2-reward-name {
+  color: var(--cr2-text);
+  font-size: 1.04rem;
+  font-weight: 700;
+}
+
+.cr2-reward-effect {
+  color: var(--cr2-neutral);
+  line-height: 1.5;
+}
+
+.cr2-shop-footer .cr2-btn-primary {
+  border-color: rgba(240, 165, 0, 0.32);
+  background: rgba(240, 165, 0, 0.12);
+}
+
+.cr2-briefing-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), var(--cr2-s2));
+  animation: cr2-slide-up 0.25s cubic-bezier(.22, 1, .36, 1);
+}
+
+.cr2-briefing-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  color: var(--cr2-text);
+}
+
+.cr2-briefing-summary p {
+  margin: 0;
+  line-height: 1.65;
+}
+
+.cr2-briefing-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.cr2-briefing-rivals,
+.cr2-briefing-company {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
   border: 1px solid var(--cr2-border);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.03);
 }
 
-.cr2-shop-screen__shop-card strong,
-.cr2-shop-screen__reward-card strong {
-  color: var(--cr2-text);
-}
-
-.cr2-shop-screen__shop-card span,
-.cr2-shop-screen__reward-chip,
-.cr2-shop-screen__briefing,
-.cr2-shop-screen__summary {
-  color: var(--cr2-neutral);
-}
-
-.cr2-shop-screen__shop-card button,
-.cr2-shop-screen__reward-card button,
-.cr2-shop-screen__claim,
-.cr2-shop-screen__briefing-btn,
-.cr2-shop-screen__footer button {
-  padding: 11px 14px;
-  border: 1px solid var(--cr2-border);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.05);
+.cr2-briefing-col-title {
+  margin: 0;
   color: var(--cr2-text);
   font-weight: 700;
-  cursor: pointer;
 }
 
-.cr2-shop-screen__shop-card[data-disabled='true'] {
-  opacity: 0.58;
-}
-
-.cr2-shop-screen__reward-grid {
+.cr2-briefing-rival-row,
+.cr2-briefing-stat-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 4px;
+  padding: 10px 0;
+  color: var(--cr2-neutral);
+  border-bottom: 1px solid var(--cr2-border);
 }
 
-.cr2-shop-screen__reward-card[data-selected='true'] {
-  border-color: rgba(240, 165, 0, 0.34);
-  background:
-    linear-gradient(180deg, rgba(240, 165, 0, 0.1), transparent 50%),
-    rgba(255, 255, 255, 0.04);
+.cr2-briefing-rival-row:last-child,
+.cr2-briefing-stat-row:last-child {
+  border-bottom: 0;
 }
 
-.cr2-shop-screen__reward-card[data-claimed='true'] {
-  opacity: 0.68;
+.cr2-briefing-empty {
+  color: var(--cr2-dim);
 }
 
-.cr2-shop-screen__reward-actions {
+.cr2-briefing-health {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
 }
 
-.cr2-shop-screen__claim,
-.cr2-shop-screen__footer button {
-  border-color: rgba(240, 165, 0, 0.32);
-  background: rgba(240, 165, 0, 0.12);
-}
-
-.cr2-shop-screen__briefing {
-  display: grid;
-  gap: 10px;
-  line-height: 1.7;
-}
-
-.cr2-shop-screen__briefing-ai {
-  padding-top: 10px;
-  border-top: 1px solid var(--cr2-border);
-  color: var(--cr2-text);
-}
-
-.cr2-shop-screen__summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 14px;
-}
-
-.cr2-shop-screen__summary span {
-  padding: 8px 12px;
-  border: 1px solid var(--cr2-border);
+.cr2-health-pip {
+  width: 14px;
+  height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.cr2-shop-screen__footer {
-  justify-content: flex-end;
+.cr2-health-pip[data-filled='true'] {
+  background: var(--cr2-positive);
 }
 
-.cr2-shop-screen__shop-card button:disabled,
-.cr2-shop-screen__reward-card button:disabled,
-.cr2-shop-screen__claim:disabled,
-.cr2-shop-screen__footer button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.cr2-btn-ghost {
+  background: transparent;
+}
+
+@keyframes cr2-slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0.25;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 @media (max-width: 960px) {
-  .cr2-shop-screen__shop-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .cr2-shop-screen__reward-grid {
+  .cr2-shop-reward-row,
+  .cr2-briefing-body {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
-  .cr2-shop-screen__head,
-  .cr2-shop-screen__section-head,
-  .cr2-shop-screen__footer {
+  .cr2-shop-header,
+  .cr2-shop-footer,
+  .cr2-briefing-footer {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .cr2-shop-screen__shop-grid {
-    grid-template-columns: 1fr;
+  .cr2-credit-item {
+    min-width: 138px;
   }
 }

@@ -4,11 +4,11 @@ import { useGameStore } from '../store/useGameStore.js'
 const ORDER_COPY = {
   conservative: {
     label: '보수적',
-    desc: '재고 위험을 낮추는 안전한 발주입니다.',
+    desc: '재고 부담을 낮추고 현금을 지키는 발주입니다.',
   },
   standard: {
     label: '기본',
-    desc: '예상 수요의 중심값에 맞춘 표준 발주입니다.',
+    desc: '예상 수요의 중간값에 맞춘 표준 발주입니다.',
   },
   aggressive: {
     label: '공격적',
@@ -39,7 +39,7 @@ export function OrderSelect() {
     <section className="cr2-order-select">
       <div className="cr2-order-select__head">
         <p className="cr2-order-select__eyebrow">Choice 2</p>
-        <h2>발주량을 확정하세요</h2>
+        <h2>발주량을 결정하세요</h2>
       </div>
 
       <div className="cr2-order-select__grid">

@@ -1,7 +1,7 @@
 export const CONSUMER_GROUPS = {
   quality: {
     id: 'quality',
-    label: '퀄리티 소비자',
+    label: '품질 소비자',
     criterion: 'quality_score',
     color: '#A78BFA',
   },
@@ -37,10 +37,10 @@ export const GROUP_RATIO_BY_PHASE = {
 
 export function getConsumerGroupRatios(econPhase = 'stable', multipliers = {}) {
   const base = GROUP_RATIO_BY_PHASE[econPhase] ?? GROUP_RATIO_BY_PHASE.stable
-  const weighted = CONSUMER_GROUP_ORDER.reduce((acc, key) => {
+  const weighted = CONSUMER_GROUP_ORDER.reduce((accumulator, key) => {
     const multiplier = multipliers[key] ?? 1
-    acc[key] = Math.max(0, base[key] * multiplier)
-    return acc
+    accumulator[key] = Math.max(0, base[key] * multiplier)
+    return accumulator
   }, {})
 
   const total = Object.values(weighted).reduce((sum, value) => sum + value, 0)
@@ -48,8 +48,8 @@ export function getConsumerGroupRatios(econPhase = 'stable', multipliers = {}) {
     return { ...GROUP_RATIO_BY_PHASE.stable }
   }
 
-  return CONSUMER_GROUP_ORDER.reduce((acc, key) => {
-    acc[key] = weighted[key] / total
-    return acc
+  return CONSUMER_GROUP_ORDER.reduce((accumulator, key) => {
+    accumulator[key] = weighted[key] / total
+    return accumulator
   }, {})
 }

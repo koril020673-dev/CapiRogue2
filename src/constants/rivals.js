@@ -7,7 +7,7 @@ export const RIVAL_TIERS = {
     priceAggressiveness: 0.85,
     brandInvestment: 0,
     qualityInvestment: 0,
-    description: '가성비 위주. 브랜드와 품질 투자는 거의 없다.',
+    description: '가성비 위주. 브랜드와 품질 투자 없음.',
   },
   2: {
     tier: 2,
@@ -17,27 +17,27 @@ export const RIVAL_TIERS = {
     priceAggressiveness: 1,
     brandInvestment: 0.5,
     qualityInvestment: 0.5,
-    description: '브랜드 또는 품질 하나만 집중한다.',
+    description: '브랜드 또는 품질 한 가지에 집중합니다.',
   },
   3: {
     tier: 3,
     name: '3단계 (4천왕급)',
     strategy: 'dual_focus',
-    strategyLabel: '복합 특화',
+    strategyLabel: '복합 전략',
     priceAggressiveness: 1,
     brandInvestment: 0.8,
     qualityInvestment: 0.8,
-    description: '가성비와 브랜드, 또는 브랜드와 품질 조합을 쓴다.',
+    description: '가성비와 브랜드, 또는 브랜드와 품질을 함께 가져갑니다.',
   },
   4: {
     tier: 4,
     name: '4단계 (챔피언급)',
     strategy: 'all_rounder',
-    strategyLabel: '올라운더',
+    strategyLabel: '전방위 공세',
     priceAggressiveness: 1,
     brandInvestment: 1,
     qualityInvestment: 1,
-    description: '모든 전략을 동시에 구사한다.',
+    description: '가성비, 브랜드, 품질을 모두 구사합니다.',
   },
 }
 
@@ -78,6 +78,15 @@ function pickTierFocus(tier) {
   }
 
   return 'value_only'
+}
+
+function getFocusLabel(focus) {
+  if (focus === 'brand') return '브랜드'
+  if (focus === 'quality') return '품질'
+  if (focus === 'value_brand') return '가성비+브랜드'
+  if (focus === 'brand_quality') return '브랜드+품질'
+  if (focus === 'all_rounder') return '복합'
+  return '가성비'
 }
 
 function getRivalName(tier, nameIndex = 0) {
@@ -131,18 +140,7 @@ export function createRivalState({ id, tier, joinFloor, active = false, nameInde
     nameIndex,
     focus,
     strategy: focus,
-    strategyLabel:
-      focus === 'brand'
-        ? '브랜드'
-        : focus === 'quality'
-          ? '품질'
-          : focus === 'value_brand'
-            ? '가성비+브랜드'
-            : focus === 'brand_quality'
-              ? '브랜드+품질'
-              : focus === 'all_rounder'
-                ? '복합'
-                : '가성비',
+    strategyLabel: getFocusLabel(focus),
     initialCapital: base.capital,
     capital: base.capital,
     health: 1,

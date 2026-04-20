@@ -1,14 +1,14 @@
-import { create } from 'zustand'
+﻿import { create } from 'zustand'
 import { ADVISORS } from '../constants/advisors.js'
 import { getConsumerGroupRatios } from '../constants/consumerGroups.js'
 import { drawWeightedEventCards, getEventCardById } from '../constants/docEvents.js'
 import { LEGACY_CONDITIONS } from '../constants/legacy.js'
-import { CREDIT_SHOP } from '../constants/rewards.js'
+import { CREDIT_SHOP_ITEMS } from '../constants/rewards.js'
 import { createInitialRivals } from '../constants/rivals.js'
 import { ORDER_TIERS, STRATEGIES, VENDOR } from '../constants/strategies.js'
 import { clamp } from '../lib/gameMath.js'
 import { applyStrategyEffect, previewStrategyEffect } from '../logic/brandQualityEngine.js'
-import { getCreditShopPrice } from '../logic/creditEngine.js'
+import { getPrice } from '../logic/creditEngine.js'
 import {
   calcDemand,
   calcDemandEstimate,
@@ -24,7 +24,7 @@ import {
   saveLegacyCards,
 } from '../logic/metaEngine.js'
 import { getMomentumEffect, updateMomentum } from '../logic/momentumEngine.js'
-import { createRewardDraft } from '../logic/rewardEngine.js'
+import { generateRewards } from '../logic/rewardEngine.js'
 import {
   applyShareDamage,
   buildRivalPlayers,
@@ -83,11 +83,11 @@ function getWarningAlerts(state) {
     recentLosses.length === 3 && recentLosses.every((profit) => profit < 0)
 
   if (state.capital < fixedCostProxy * 2) {
-    alerts.push('⚠️ 현금 부족 경고')
+    alerts.push('⚠ 현금 부족 경고')
   }
 
   if (hasThreeStraightLosses) {
-    alerts.push('⚠️ 3연속 적자')
+    alerts.push('⚠ 3연속 적자')
   }
 
   if (state.companyHealth <= 3) {
@@ -264,10 +264,13 @@ function createBaseState() {
     saveExists,
     advisorFeeTotal: 0,
     warWinCount: 0,
+    currentRewards: [],
     rewardPending: null,
     rewardSelection: null,
     rewardClaimed: false,
     shopPurchasesThisFloor: [],
+    _fixedCostMul: 1,
+    _interestMul: 1,
     warningAlerts: [],
     toasts: [],
     decisionLog: [],
@@ -529,12 +532,12 @@ function prepareNextFloorState(state, { keepEffects = true } = {}) {
   const base = {
     ...state,
     floorStage: 'market',
-    lastSettlement: null,
     currentEventResolved: false,
     currentEventChoiceId: null,
     lastEventResult: null,
     selectedStrategyId: null,
     selectedOrderTier: null,
+    currentRewards: [],
     rewardPending: null,
     rewardSelection: null,
     rewardClaimed: false,
@@ -594,7 +597,7 @@ export const useGameStore = create((set, get) => {
       if (!safeUserId || !safePassword) {
         set((state) => ({
           ...state,
-          loginError: 'ID와 비밀번호를 모두 입력해주세요.',
+          loginError: 'ID? 鍮꾨?踰덊샇瑜?紐⑤몢 ?낅젰?댁＜?몄슂.',
         }))
         return
       }
@@ -615,7 +618,7 @@ export const useGameStore = create((set, get) => {
         saveExists: hasSaveSlot(),
       }))
       enqueueToast(
-        isAdmin ? '관리자 모드로 로그인되었습니다.' : `${safeUserId} 계정으로 로그인되었습니다.`,
+        isAdmin ? '愿由ъ옄 紐⑤뱶濡?濡쒓렇?몃릺?덉뒿?덈떎.' : `${safeUserId} 怨꾩젙?쇰줈 濡쒓렇?몃릺?덉뒿?덈떎.`,
         isAdmin ? 'warning' : 'positive',
       )
     },
@@ -864,9 +867,9 @@ export const useGameStore = create((set, get) => {
       const predictedRevenue = predictedSales * plan.sellPrice
       const predictedCost = plan.orderQty * plan.previewUnitCost
       const fixedTotal =
-        Math.round((state.debt * state.interestRate) / 12) +
+        Math.round((state.debt * state.interestRate * (state._interestMul ?? 1)) / 12) +
         (state.realty === 'monthly' ? 1000000 : 0) +
-        state.monthlyFixedCost
+        Math.round(state.monthlyFixedCost * (state._fixedCostMul ?? 1))
       const predictedProfit = predictedRevenue - predictedCost - fixedTotal
 
       return {
@@ -921,11 +924,36 @@ export const useGameStore = create((set, get) => {
       enqueueToast(message, success ? 'positive' : 'negative')
     },
 
-    closeSettlementModal: () =>
+    advanceToSettlement: () =>
+      set((state) => ({
+        ...state,
+        floorStage: 'settlement',
+      })),
+
+    advanceToShop: () =>
       set((state) => ({
         ...state,
         floorStage: 'shop',
+        currentRewards: [],
+        rewardSelection: null,
+        rewardClaimed: false,
       })),
+
+    closeSettlementModal: () => {
+      get().advanceToShop()
+    },
+
+    generateFloorRewards: () => {
+      const state = get()
+      if (state.currentRewards.length > 0) {
+        return
+      }
+
+      set((current) => ({
+        ...current,
+        currentRewards: generateRewards(current.momentum),
+      }))
+    },
 
     selectReward: (rewardId) =>
       set((state) => ({
@@ -933,91 +961,193 @@ export const useGameStore = create((set, get) => {
         rewardSelection: rewardId,
       })),
 
-    claimReward: () => {
+    applyReward: (reward) => {
       const state = get()
-      if (!state.rewardPending || !state.rewardSelection || state.rewardClaimed) {
-        return
-      }
-
-      const reward = state.rewardPending.options.find((entry) => entry.id === state.rewardSelection)
       if (!reward) {
         return
       }
 
-      const nextState = applyRewardEffect(
-        {
-          ...state,
-          credits: state.credits + state.rewardPending.credits,
-        },
-        reward,
-      )
-
-      set({
-        ...nextState,
+      const updates = {
         rewardClaimed: true,
-      })
+      }
+
+      switch (reward.effectType) {
+        case 'health':
+          updates.companyHealth = Math.min(state.maxHealth, state.companyHealth + reward.value)
+          break
+        case 'brand':
+          updates.brandValue = state.brandValue + reward.value
+          break
+        case 'quality':
+          updates.qualityScore = state.qualityScore + reward.value
+          break
+        case 'credit':
+          updates.credits = state.credits + reward.value
+          break
+        case 'capitalMul':
+          updates.capital = Math.round(state.capital * (1 + reward.value))
+          break
+        case 'resistance':
+          updates.priceResistance = state.priceResistance + reward.value
+          break
+        case 'fixedCostMul':
+          updates._fixedCostMul = (state._fixedCostMul ?? 1) * (1 - reward.value)
+          break
+        case 'interestMul':
+          updates._interestMul = (state._interestMul ?? 1) * (1 - reward.value)
+          break
+        case 'costMul':
+          updates.activeEffects = [
+            ...state.activeEffects,
+            {
+              id: `reward-cost-${Date.now()}`,
+              type: 'tempCostMul',
+              value: -reward.value,
+              turnsLeft: 1,
+            },
+          ]
+          break
+        default:
+          break
+      }
+
+      set((current) => ({
+        ...current,
+        ...updates,
+      }))
+    },
+
+    claimReward: () => {
+      const state = get()
+      const reward = state.currentRewards.find((entry) => entry.id === state.rewardSelection)
+      if (!reward) {
+        return
+      }
+
+      get().applyReward(reward)
       saveSaveSlot(buildSaveSnapshot(get()))
     },
 
-    continueFromShop: () => {
+    advanceToNextFloor: () => {
       const state = get()
-      if (state.floorStage !== 'shop' || !state.rewardClaimed) {
+
+      if (state.floor >= state.maxFloors) {
+        const terminalState = {
+          ...state,
+          screen: 'gameover',
+          gameStatus: 'clear',
+          saveExists: false,
+        }
+        const legacyCards = resolveLegacyCards(terminalState, 'clear')
+        const meta = recordGameEnd('clear', {
+          ...state.meta,
+          advisorUsed: Array.from(new Set([...(state.meta.advisorUsed ?? []), state.advisor])),
+          analystPlays: state.meta.analystPlays + (state.advisor === 'analyst' ? 1 : 0),
+          floor50Reached:
+            state.floor >= 50 ? state.meta.floor50Reached + 1 : state.meta.floor50Reached,
+          floor80Reached:
+            state.floor >= 80 ? state.meta.floor80Reached + 1 : state.meta.floor80Reached,
+        })
+
+        set({
+          ...terminalState,
+          legacyCards,
+          meta,
+        })
+        clearSaveSlot()
+        const playHistory = appendRunHistory(
+          buildHistoryEntry({ ...terminalState, legacyCards }, 'clear'),
+        )
+        set((current) => ({
+          ...current,
+          playHistory,
+          saveExists: false,
+        }))
         return
       }
 
       const nextState = prepareNextFloorState({
         ...state,
-        consumerGroupRatios: getConsumerGroupRatios(state.econPhase),
+        floor: state.floor + 1,
+        floorStage: 'market',
+        currentRewards: [],
+        rewardPending: null,
+        rewardSelection: null,
+        rewardClaimed: false,
       })
 
       set(nextState)
       saveSaveSlot(buildSaveSnapshot(nextState))
     },
 
-    buyShopItem: (shopId) => {
+    continueFromShop: () => {
+      const state = get()
+      if (state.floorStage !== 'shop' || !state.rewardSelection) {
+        return
+      }
+
+      const reward = state.currentRewards.find((entry) => entry.id === state.rewardSelection)
+      if (!reward) {
+        return
+      }
+
+      get().applyReward(reward)
+      get().advanceToNextFloor()
+    },
+
+    buyItem: (itemId) => {
       const state = get()
       if (state.floorStage !== 'shop') {
         return
       }
 
-      const item = CREDIT_SHOP.find((entry) => entry.id === shopId)
+      const item = CREDIT_SHOP_ITEMS.find((entry) => entry.id === itemId)
       if (!item) {
         return
       }
 
-      const price = getCreditShopPrice(item.baseCost, state.floor)
-      if (state.credits < price || state.shopPurchasesThisFloor.includes(shopId)) {
+      const price = getPrice(item.baseCost, state.floor)
+      if (state.credits < price || state.shopPurchasesThisFloor.includes(itemId)) {
         return
       }
 
       const activeEffects = [...state.activeEffects]
-      if (item.effect.noWaste) {
-        activeEffects.push({ id: `nowaste-${Date.now()}`, type: 'noWaste', value: 1, turnsLeft: 1 })
+      let companyHealth = state.companyHealth
+
+      if (itemId === 'health_1') {
+        companyHealth = Math.min(state.maxHealth, state.companyHealth + 1)
       }
-      if (item.effect.rivalFreeze) {
-        activeEffects.push({ id: `freeze-${Date.now()}`, type: 'rivalFreeze', value: 1, turnsLeft: 1 })
+
+      if (itemId === 'health_2') {
+        companyHealth = Math.min(state.maxHealth, state.companyHealth + 2)
       }
-      if (item.effect.preview) {
+
+      if (itemId === 'preview') {
         activeEffects.push({ id: `preview-${Date.now()}`, type: 'preview', value: 1, turnsLeft: 1 })
       }
-      if (item.effect.rerollEvent) {
-        activeEffects.push({ id: `reroll-${Date.now()}`, type: 'rerollEvent', value: 1, turnsLeft: 1 })
+
+      if (itemId === 'freeze') {
+        activeEffects.push({ id: `freeze-${Date.now()}`, type: 'rivalFreeze', value: 1, turnsLeft: 1 })
+      }
+
+      if (itemId === 'no_waste') {
+        activeEffects.push({ id: `nowaste-${Date.now()}`, type: 'noWaste', value: 1, turnsLeft: 1 })
       }
 
       const nextState = {
         ...state,
         credits: state.credits - price,
-        companyHealth: applyHealth(
-          state.companyHealth,
-          item.effect.companyHealth ?? 0,
-          state.maxHealth,
-        ),
+        companyHealth,
         activeEffects,
-        shopPurchasesThisFloor: [...state.shopPurchasesThisFloor, shopId],
+        shopPurchasesThisFloor: [...state.shopPurchasesThisFloor, itemId],
       }
 
       set(nextState)
       saveSaveSlot(buildSaveSnapshot(nextState))
+    },
+
+    buyShopItem: (itemId) => {
+      get().buyItem(itemId)
     },
 
     adminJumpToFloor: (targetFloor) => {
@@ -1034,7 +1164,7 @@ export const useGameStore = create((set, get) => {
 
       const nextState = prepareNextFloorState({
         ...state,
-        floor: nextFloor,
+        floor: state.floor,
         rivals: nextRivals,
         currentEventCardId: null,
         currentEventResolved: false,
@@ -1048,7 +1178,7 @@ export const useGameStore = create((set, get) => {
 
       set(nextState)
       saveSaveSlot(buildSaveSnapshot(nextState))
-      enqueueToast(`${nextFloor}층으로 이동했습니다.`, 'warning')
+      enqueueToast(`${nextFloor}痢듭쑝濡??대룞?덉뒿?덈떎.`, 'warning')
     },
 
     adminGrantCapital: (amount) => {
@@ -1063,7 +1193,7 @@ export const useGameStore = create((set, get) => {
       }
       set(nextState)
       saveSaveSlot(buildSaveSnapshot(nextState))
-      enqueueToast(`현금 ${Math.round(Number(amount) || 0).toLocaleString()}원을 지급했습니다.`, 'positive')
+      enqueueToast(`?꾧툑 ${Math.round(Number(amount) || 0).toLocaleString()}?먯쓣 吏湲됲뻽?듬땲??`, 'positive')
     },
 
     adminGrantCredits: (amount) => {
@@ -1078,7 +1208,7 @@ export const useGameStore = create((set, get) => {
       }
       set(nextState)
       saveSaveSlot(buildSaveSnapshot(nextState))
-      enqueueToast(`크레딧 ${Math.round(Number(amount) || 0)}C를 지급했습니다.`, 'positive')
+      enqueueToast(`?щ젅??${Math.round(Number(amount) || 0)}C瑜?吏湲됲뻽?듬땲??`, 'positive')
     },
 
     adminHealCompany: () => {
@@ -1093,7 +1223,7 @@ export const useGameStore = create((set, get) => {
       }
       set(nextState)
       saveSaveSlot(buildSaveSnapshot(nextState))
-      enqueueToast('회사 체력을 최대로 회복했습니다.', 'positive')
+      enqueueToast('?뚯궗 泥대젰??理쒕?濡??뚮났?덉뒿?덈떎.', 'positive')
     },
 
     confirmTurn: () => {
@@ -1160,10 +1290,12 @@ export const useGameStore = create((set, get) => {
         vendorUnitCost: plan.vendorUnitCost,
         qualityMode: plan.qualityMode,
         factoryActive: state.factory.built && state.factory.buildTurnsLeft <= 0,
-        monthlyInterest: Math.round(state.debt * state.interestRate / 12),
+        monthlyInterest: Math.round(
+          (state.debt * state.interestRate * (state._interestMul ?? 1)) / 12,
+        ),
         monthlyRent: state.realty === 'monthly' ? 1000000 : 0,
         safetyCost: state.factory.built && state.factory.safetyOn ? 5000000 : 0,
-        otherFixed: state.monthlyFixedCost,
+        otherFixed: Math.round(state.monthlyFixedCost * (state._fixedCostMul ?? 1)),
         rivals: getActiveRivals(state.rivals),
       })
 
@@ -1220,20 +1352,13 @@ export const useGameStore = create((set, get) => {
         result.fixedTotal -
         advisorFee +
         salvageValue
-      const nextFloor = state.floor + 1
       const nextEconPhase = advanceEconPhase(state.econPhase, state.meta.boomBonus ?? 0)
-      const rivalsAfterJoin = ensureRivalsJoined(nextRivals, nextFloor)
+      const rivalsAfterJoin = ensureRivalsJoined(nextRivals, state.floor + 1)
       const biggestRival = getBiggestRival(rivalsAfterJoin)
-      const rewardPending = createRewardDraft({
-        floor: state.floor,
-        momentum: momentumState.momentum,
-      })
 
       let gameStatus = 'playing'
       if (companyHealth <= 0 || nextCapital - state.debt < -30000000) {
         gameStatus = 'bankrupt'
-      } else if (state.floor >= state.maxFloors) {
-        gameStatus = 'clear'
       }
 
       const settlement = {
@@ -1297,7 +1422,8 @@ export const useGameStore = create((set, get) => {
           ),
         ),
         lastSettlement: settlement,
-        rewardPending: gameStatus === 'playing' ? rewardPending : null,
+        currentRewards: [],
+        rewardPending: null,
         rewardSelection: null,
         rewardClaimed: false,
         currentEventCardId: null,
@@ -1329,7 +1455,7 @@ export const useGameStore = create((set, get) => {
 
       if (gameStatus === 'playing') {
         set(draftState)
-        saveSaveSlot(buildSaveSnapshot(get()))
+        saveSaveSlot(buildSaveSnapshot(draftState))
         enqueueToast(
           `${state.floor}층 정산 완료 · ${netProfit >= 0 ? '+' : ''}${Math.round(netProfit).toLocaleString()}원`,
           netProfit >= 0 ? 'positive' : 'negative',
