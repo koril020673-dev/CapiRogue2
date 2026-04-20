@@ -43,10 +43,13 @@ import {
 import {
   appendRunHistory,
   clearSaveSlot,
+  clearAuthSession,
   hasSaveSlot,
+  loadAuthSession,
   loadRunHistory,
   loadSaveSlot,
   loadSettings,
+  saveAuthSession,
   saveSaveSlot,
   saveSettings,
 } from '../logic/saveEngine.js'
@@ -197,13 +200,16 @@ function createBaseState() {
   const settings = loadSettings()
   const playHistory = loadRunHistory()
   const saveExists = hasSaveSlot()
+  const auth = loadAuthSession()
 
   return {
-    screen: 'title',
+    screen: auth.isLoggedIn ? 'title' : 'login',
     floor: 1,
     maxFloors: 120,
     gameStatus: 'idle',
     floorPhase: 'normal',
+    auth,
+    loginError: '',
     advisor: null,
     advisorDraft: null,
     difficulty: 'fixed',
@@ -266,6 +272,47 @@ function createBaseState() {
     peakMarketShare: 0,
     warPaused: false,
     previewOpen: false,
+  }
+}
+
+function getEconomicWarStateForFloor(floor, rivals) {
+  const activeEntry = Object.entries(ECONOMIC_WARS)
+    .map(([startFloor, war]) => ({
+      startFloor: Number(startFloor),
+      war,
+    }))
+    .sort((left, right) => right.startFloor - left.startFloor)
+    .find(({ startFloor, war }) => {
+      if (floor < startFloor) {
+        return false
+      }
+
+      if (war.duration === 'until clear') {
+        return true
+      }
+
+      return floor < startFloor + war.duration
+    })
+
+  if (!activeEntry) {
+    return null
+  }
+
+  const { startFloor, war } = activeEntry
+  const rivalIds =
+    war.rival === 'all'
+      ? RIVAL_ORDER.filter((rivalId) => rivals[rivalId]?.active)
+      : [war.rival]
+
+  return {
+    warId: war.id,
+    name: war.name,
+    rivalIds,
+    duration: war.duration,
+    floorsLeft:
+      war.duration === 'until clear'
+        ? 999
+        : Math.max(0, war.duration - Math.max(0, floor - startFloor)),
   }
 }
 
@@ -505,8 +552,10 @@ function maybeTriggerBlackSwan(state) {
 }
 
 function buildSaveSnapshot(state) {
+  const { auth, loginError, ...persisted } = state
+
   return {
-    ...state,
+    ...persisted,
     screen: 'game',
     saveExists: true,
     toasts: [],
@@ -549,6 +598,58 @@ export const useGameStore = create((set, get) => {
 
     dismissToast,
 
+    login: ({ userId, password }) => {
+      const safeUserId = String(userId ?? '').trim()
+      const safePassword = String(password ?? '').trim()
+
+      if (!safeUserId || !safePassword) {
+        set((state) => ({
+          ...state,
+          loginError: 'ID와 비밀번호를 모두 입력해주세요.',
+        }))
+        return
+      }
+
+      const isAdmin = safeUserId === '1234' && safePassword === '1234'
+      const auth = {
+        isLoggedIn: true,
+        isAdmin,
+        userId: safeUserId,
+      }
+
+      saveAuthSession(auth)
+      set((state) => ({
+        ...state,
+        auth,
+        loginError: '',
+        screen: 'title',
+        saveExists: hasSaveSlot(),
+      }))
+      enqueueToast(
+        isAdmin ? '관리자 모드로 로그인되었습니다.' : `${safeUserId} 계정으로 로그인되었습니다.`,
+        isAdmin ? 'warning' : 'positive',
+      )
+    },
+
+    logout: () => {
+      clearAuthSession()
+      set((state) => ({
+        ...state,
+        auth: {
+          isLoggedIn: false,
+          isAdmin: false,
+          userId: '',
+        },
+        loginError: '',
+        screen: 'login',
+        shopOpen: false,
+        previewOpen: false,
+        settlementModalOpen: false,
+        shopScreenOpen: false,
+        toasts: [],
+      }))
+    },
+
     backToTitle: () =>
       set((state) => ({
         ...createBaseState(),
@@ -578,9 +679,15 @@ export const useGameStore = create((set, get) => {
         ...state,
         screen: 'advisor',
         advisorDraft: state.advisor ?? 'analyst',
+        loginError: '',
       })),
 
     continueRun: () => {
+      const currentState = get()
+      if (!currentState.auth?.isLoggedIn) {
+        return
+      }
+
       const saved = loadSaveSlot()
       if (!saved) {
         return
@@ -616,6 +723,117 @@ export const useGameStore = create((set, get) => {
         ...state,
         advisorDraft: advisorId,
       })),
+
+    adminJumpToFloor: (targetFloor) => {
+      const state = get()
+      if (!state.auth?.isAdmin || state.gameStatus !== 'playing') {
+        return
+      }
+
+      const nextFloor = clamp(Math.round(Number(targetFloor) || 1), 1, state.maxFloors)
+      let nextRivals = createInitialRivals()
+
+      for (let floorIndex = 2; floorIndex <= nextFloor; floorIndex += 1) {
+        nextRivals = ensureRivalsJoined(nextRivals, floorIndex, state.industryTier)
+      }
+
+      const activeEconomicWar = getEconomicWarStateForFloor(nextFloor, nextRivals)
+      const draftState = {
+        ...state,
+        floor: nextFloor,
+        rivals: nextRivals,
+        activeEconomicWar,
+        activeBlackSwan: null,
+        blackSwanSeen: false,
+        settlementModalOpen: false,
+        shopScreenOpen: false,
+        selectedStrategyId: null,
+        selectedOrderTier: null,
+        currentEventResolved: false,
+        currentEventChoiceId: null,
+        lastEventResult: null,
+        lastSettlement: null,
+        rewardPending: null,
+        rewardSelection: null,
+        rewardClaimed: false,
+        shopOpen: false,
+        shopPurchasesThisFloor: [],
+        warningAlerts: [],
+      }
+
+      const currentEventCardId = drawCurrentEvent(draftState)
+      const finalState = {
+        ...draftState,
+        currentEventCardId,
+        warningAlerts: getWarningAlerts({
+          ...draftState,
+          currentEventCardId,
+        }),
+        floorPhase: activeEconomicWar ? 'economic-war' : 'normal',
+      }
+
+      set(finalState)
+      saveSaveSlot(buildSaveSnapshot(finalState))
+      enqueueToast(`${nextFloor}층 체크포인트로 이동했습니다.`, 'warning')
+    },
+
+    adminGrantCapital: (amount) => {
+      const state = get()
+      if (!state.auth?.isAdmin || state.gameStatus !== 'playing') {
+        return
+      }
+
+      const nextCapital = Math.max(0, state.capital + Math.round(Number(amount) || 0))
+      const nextState = {
+        ...state,
+        capital: nextCapital,
+        warningAlerts: getWarningAlerts({
+          ...state,
+          capital: nextCapital,
+        }),
+      }
+
+      set(nextState)
+      saveSaveSlot(buildSaveSnapshot(nextState))
+      enqueueToast(`현금 ${Math.round(Number(amount) || 0).toLocaleString()}원을 지급했습니다.`, 'positive')
+    },
+
+    adminGrantCredits: (amount) => {
+      const state = get()
+      if (!state.auth?.isAdmin || state.gameStatus !== 'playing') {
+        return
+      }
+
+      const nextCredits = Math.max(0, state.credits + Math.round(Number(amount) || 0))
+      const nextState = {
+        ...state,
+        credits: nextCredits,
+      }
+
+      set(nextState)
+      saveSaveSlot(buildSaveSnapshot(nextState))
+      enqueueToast(`크레딧 ${Math.round(Number(amount) || 0)}C를 지급했습니다.`, 'positive')
+    },
+
+    adminHealCompany: () => {
+      const state = get()
+      if (!state.auth?.isAdmin || state.gameStatus !== 'playing') {
+        return
+      }
+
+      const nextState = {
+        ...state,
+        companyHealth: state.maxHealth,
+        warningAlerts: getWarningAlerts({
+          ...state,
+          companyHealth: state.maxHealth,
+        }),
+      }
+
+      set(nextState)
+      saveSaveSlot(buildSaveSnapshot(nextState))
+      enqueueToast('회사 체력을 최대로 회복했습니다.', 'positive')
+    },
 
     confirmAdvisor: () => {
       const state = get()

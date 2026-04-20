@@ -1,10 +1,6 @@
 .cr2-game-screen {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.08), transparent 18%),
-    radial-gradient(circle at 82% 12%, rgba(240, 165, 0, 0.1), transparent 20%),
-    linear-gradient(180deg, rgba(118, 142, 191, 0.12), transparent 18%),
-    var(--cr2-bg);
+  background-color: var(--cr2-bg);
 }
 
 .cr2-game-screen__body {
@@ -28,55 +24,19 @@
   min-height: 560px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 30px;
-  background:
-    linear-gradient(180deg, rgba(155, 178, 223, 0.14), rgba(37, 66, 88, 0.08) 24%, transparent 24%),
-    linear-gradient(180deg, rgba(67, 131, 76, 0.92) 0%, rgba(61, 121, 70, 0.96) 62%, rgba(33, 88, 48, 1) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 30px 80px rgba(0, 0, 0, 0.22);
+  border-radius: 12px;
+  background-color: #212c36;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .cr2-game-screen__arena[data-war='true'] {
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 107, 107, 0.24),
-    0 30px 80px rgba(0, 0, 0, 0.22);
+  border-color: rgba(255, 107, 107, 0.6);
+  background-color: #2c2124;
 }
 
 .cr2-game-screen__arena[data-swan='true'] {
-  background:
-    linear-gradient(180deg, rgba(126, 99, 150, 0.24), rgba(48, 27, 59, 0.2) 24%, transparent 24%),
-    linear-gradient(180deg, rgba(56, 84, 104, 0.92) 0%, rgba(38, 71, 86, 0.96) 62%, rgba(23, 48, 60, 1) 100%);
-}
-
-.cr2-game-screen__arena-backdrop,
-.cr2-game-screen__arena-scanlines,
-.cr2-game-screen__stage,
-.cr2-game-screen__action-burst,
-.cr2-game-screen__signal-waves {
-  position: absolute;
-  inset: 0;
-}
-
-.cr2-game-screen__arena-backdrop {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 14%),
-    radial-gradient(circle at 76% 34%, rgba(255, 255, 255, 0.12), transparent 12%),
-    radial-gradient(circle at 50% 72%, rgba(0, 0, 0, 0.12), transparent 26%);
-  pointer-events: none;
-}
-
-.cr2-game-screen__arena-scanlines {
-  background: repeating-linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.03) 0,
-    rgba(255, 255, 255, 0.03) 2px,
-    transparent 2px,
-    transparent 18px
-  );
-  mix-blend-mode: soft-light;
-  opacity: 0.45;
-  pointer-events: none;
+  border-color: rgba(167, 139, 250, 0.6);
+  background-color: #222030;
 }
 
 .cr2-game-screen__arena-overlay {
@@ -96,12 +56,10 @@
   gap: 8px;
   width: min(360px, 100%);
   padding: 14px 16px;
-  border: 1px solid rgba(40, 28, 44, 0.7);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(58, 43, 69, 0.96), rgba(43, 33, 54, 0.96)),
-    var(--cr2-s2);
-  box-shadow: 0 14px 30px rgba(16, 12, 20, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background-color: rgba(25, 34, 45, 0.95);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .cr2-game-screen__arena-hud--enemy {
@@ -138,29 +96,21 @@
 }
 
 .cr2-game-screen__hud-bar {
-  height: 14px;
+  height: 8px;
   overflow: hidden;
-  border: 2px solid rgba(240, 237, 232, 0.32);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.3);
 }
 
 .cr2-game-screen__hud-bar span {
   display: block;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--cr2-positive) 78%, white),
-    color-mix(in srgb, var(--cr2-positive) 92%, var(--cr2-warning))
-  );
+  background-color: var(--cr2-positive);
+  transition: width 0.3s ease;
 }
 
 .cr2-game-screen__hud-bar--player span {
-  background: linear-gradient(
-    90deg,
-    var(--cr2-accent),
-    color-mix(in srgb, var(--cr2-accent) 56%, white)
-  );
+  background-color: var(--cr2-accent);
 }
 
 .cr2-game-screen__support-rivals {
@@ -180,20 +130,16 @@
   align-items: center;
   min-width: 180px;
   padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--cr2-rival-accent) 28%, rgba(255, 255, 255, 0.08));
-  border-radius: 16px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--cr2-rival-accent) 10%, transparent), transparent 66%),
-    rgba(18, 18, 26, 0.76);
-  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 4px solid var(--cr2-rival-accent);
+  border-radius: 8px;
+  background-color: rgba(25, 34, 45, 0.95);
 }
 
 .cr2-game-screen__support-rival img {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   object-fit: contain;
-  mix-blend-mode: multiply;
-  filter: contrast(1.04) brightness(0.92);
 }
 
 .cr2-game-screen__support-rival div {
@@ -216,6 +162,7 @@
   z-index: 4;
   align-self: end;
   justify-self: center;
+  transition: transform 0.2s ease;
 }
 
 .cr2-game-screen__sprite--enemy {
@@ -233,37 +180,30 @@
   position: absolute;
   left: 50%;
   bottom: -8px;
-  width: 136px;
-  height: 34px;
-  border-radius: 999px;
-  background: rgba(15, 15, 20, 0.28);
+  width: 80px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.4);
   transform: translateX(-50%);
-  filter: blur(3px);
 }
 
 .cr2-game-screen__sprite-badge {
   position: relative;
   display: grid;
   place-items: center;
-  width: 180px;
-  height: 180px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 42% 58% 48% 52% / 48% 40% 60% 52%;
-  background:
-    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.52), transparent 24%),
-    radial-gradient(circle at 72% 72%, color-mix(in srgb, var(--cr2-accent) 22%, transparent), transparent 46%),
-    linear-gradient(145deg, rgba(246, 242, 236, 0.96), rgba(218, 211, 201, 0.88));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    0 24px 38px rgba(0, 0, 0, 0.18);
+  width: 140px;
+  height: 140px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background-color: #f1f5f9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
 }
 
 .cr2-game-screen__sprite-badge img {
-  width: 72%;
-  height: 72%;
+  width: 65%;
+  height: 65%;
   object-fit: contain;
-  filter: contrast(1.08) brightness(0.88);
-  mix-blend-mode: multiply;
 }
 
 .cr2-game-screen__sprite-caption {
@@ -289,156 +229,48 @@
   gap: 8px;
   align-content: center;
   justify-items: center;
-  width: 148px;
-  height: 148px;
-  padding-top: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 28px 28px 36px 36px;
-  background:
-    linear-gradient(180deg, rgba(217, 179, 128, 0.88), rgba(146, 108, 70, 0.96)),
-    var(--cr2-s2);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 20px 34px rgba(0, 0, 0, 0.22);
-}
-
-.cr2-game-screen__player-emblem::before {
-  content: '';
-  position: absolute;
-  inset: 24px 22px 22px;
-  background: linear-gradient(180deg, rgba(96, 67, 41, 0.98), rgba(74, 50, 31, 1));
-  clip-path: polygon(50% 0, 94% 36%, 72% 100%, 28% 100%, 6% 36%);
+  width: 120px;
+  height: 120px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background-color: #334155;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
 }
 
 .cr2-game-screen__player-emblem-mark,
 .cr2-game-screen__player-emblem-copy {
-  position: relative;
-  z-index: 1;
   color: rgba(255, 245, 230, 0.95);
 }
 
 .cr2-game-screen__player-emblem-mark {
   font-size: 2rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
 }
 
 .cr2-game-screen__player-emblem-copy {
   font-size: 0.75rem;
-  letter-spacing: 0.16em;
-}
-
-.cr2-game-screen__stage {
-  background:
-    linear-gradient(180deg, transparent 0 58%, rgba(255, 255, 255, 0.08) 58%, rgba(255, 255, 255, 0.08) 60%, transparent 60%),
-    linear-gradient(180deg, transparent 0 68%, rgba(255, 255, 255, 0.06) 68%, rgba(255, 255, 255, 0.06) 70%, transparent 70%),
-    linear-gradient(180deg, transparent 0 78%, rgba(255, 255, 255, 0.05) 78%, rgba(255, 255, 255, 0.05) 80%, transparent 80%);
-  pointer-events: none;
-}
-
-.cr2-game-screen__stage-ring {
-  position: absolute;
-  display: block;
-  width: 188px;
-  height: 58px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.08) 62%, transparent 66%);
-  filter: blur(1px);
-}
-
-.cr2-game-screen__stage-ring--enemy {
-  right: 112px;
-  bottom: 98px;
-}
-
-.cr2-game-screen__stage-ring--player {
-  left: 62px;
-  bottom: 54px;
-}
-
-.cr2-game-screen__action-burst,
-.cr2-game-screen__signal-waves {
-  pointer-events: none;
-  z-index: 3;
-}
-
-.cr2-game-screen__action-burst span,
-.cr2-game-screen__signal-waves span {
-  position: absolute;
-  display: block;
-  opacity: 0;
-}
-
-.cr2-game-screen__action-burst span {
-  left: 24%;
-  top: 64%;
-  width: 220px;
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255, 214, 124, 0.88), rgba(255, 214, 124, 0));
-}
-
-.cr2-game-screen__action-burst span:nth-child(2) {
-  top: 60%;
-}
-
-.cr2-game-screen__action-burst span:nth-child(3) {
-  top: 68%;
-}
-
-.cr2-game-screen__signal-waves span {
-  left: 12%;
-  bottom: 22%;
-  width: 120px;
-  height: 120px;
-  border: 2px solid rgba(255, 255, 255, 0.18);
-  border-radius: 50%;
-}
-
-.cr2-game-screen__arena[data-strategy='volume'] .cr2-game-screen__action-burst span {
-  animation: cr2-rush-line 1.15s linear infinite;
-}
-
-.cr2-game-screen__arena[data-strategy='volume'] .cr2-game-screen__action-burst span:nth-child(2) {
-  animation-delay: 0.18s;
-}
-
-.cr2-game-screen__arena[data-strategy='volume'] .cr2-game-screen__action-burst span:nth-child(3) {
-  animation-delay: 0.36s;
+  letter-spacing: 0.1em;
 }
 
 .cr2-game-screen__arena[data-strategy='quality'] .cr2-game-screen__sprite-badge,
 .cr2-game-screen__arena[data-strategy='quality'] .cr2-game-screen__player-emblem {
-  animation: cr2-quality-pulse 1.5s ease-in-out infinite;
-}
-
-.cr2-game-screen__arena[data-strategy='marketing'] .cr2-game-screen__signal-waves span {
-  animation: cr2-wave-broadcast 1.6s ease-out infinite;
-}
-
-.cr2-game-screen__arena[data-strategy='marketing'] .cr2-game-screen__signal-waves span:nth-child(2) {
-  animation-delay: 0.32s;
-}
-
-.cr2-game-screen__arena[data-strategy='marketing'] .cr2-game-screen__signal-waves span:nth-child(3) {
-  animation-delay: 0.64s;
+  border-color: rgba(240, 165, 0, 0.8);
+  box-shadow: 0 0 0 4px rgba(240, 165, 0, 0.1);
 }
 
 .cr2-game-screen__arena[data-strategy='safe'] .cr2-game-screen__player-emblem {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 20px 34px rgba(0, 0, 0, 0.22),
-    0 0 0 12px rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.8);
+  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.1);
 }
 
-.cr2-game-screen__arena[data-order='aggressive'] .cr2-game-screen__player-emblem,
-.cr2-game-screen__arena[data-order='aggressive'] .cr2-game-screen__sprite-badge {
+.cr2-game-screen__arena[data-order='aggressive'] .cr2-game-screen__sprite {
   transform: translateY(-4px);
 }
 
 .cr2-game-screen__arena[data-order='conservative'] .cr2-game-screen__support-rivals {
-  opacity: 0.86;
+  opacity: 0.85;
 }
 
 .cr2-game-screen__command-zone {
@@ -449,14 +281,10 @@
 
 .cr2-game-screen__prompt-box,
 .cr2-game-screen__command-stack {
-  border: 1px solid rgba(255, 107, 107, 0.3);
-  border-radius: 24px;
-  background:
-    linear-gradient(180deg, rgba(72, 47, 57, 0.98), rgba(49, 34, 42, 0.98)),
-    var(--cr2-s1);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 18px 34px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background-color: var(--cr2-s1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .cr2-game-screen__prompt-box {
@@ -467,72 +295,76 @@
 }
 
 .cr2-game-screen__prompt-eyebrow {
-  color: rgba(255, 214, 184, 0.76);
+  color: var(--cr2-neutral);
   font-size: 0.82rem;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .cr2-game-screen__prompt-box h2 {
   color: rgba(255, 247, 239, 0.98);
-  font-size: clamp(1.4rem, 2vw, 2.1rem);
+  font-size: clamp(1.4rem, 2vw, 1.8rem);
   line-height: 1.3;
 }
 
 .cr2-game-screen__prompt-tags {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .cr2-game-screen__prompt-tags span {
-  padding: 12px 14px;
+  padding: 8px 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.03);
   color: rgba(240, 237, 232, 0.72);
-  font-size: 0.92rem;
+  font-size: 0.85rem;
 }
 
 .cr2-game-screen__prompt-tags span[data-ready='true'] {
-  border-color: rgba(240, 165, 0, 0.28);
+  border-color: rgba(240, 165, 0, 0.4);
   color: rgba(255, 247, 239, 0.95);
-  background: rgba(240, 165, 0, 0.08);
+  background-color: rgba(240, 165, 0, 0.1);
 }
 
 .cr2-game-screen__action-feed {
   display: grid;
-  gap: 10px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .cr2-game-screen__action-item {
   display: grid;
   gap: 4px;
-  padding: 12px 14px;
+  padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
+  border-left: 4px solid var(--cr2-neutral);
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.02);
 }
 
 .cr2-game-screen__action-item strong {
-  color: rgba(255, 247, 239, 0.95);
+  color: var(--cr2-text);
+  font-size: 0.95rem;
 }
 
 .cr2-game-screen__action-item span {
   color: var(--cr2-neutral);
-  font-size: 0.88rem;
-  line-height: 1.55;
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .cr2-game-screen__action-item[data-kind='strategy'] {
-  border-color: rgba(240, 165, 0, 0.24);
+  border-left-color: rgba(240, 165, 0, 0.8);
 }
 
 .cr2-game-screen__action-item[data-kind='order'] {
-  border-color: rgba(74, 222, 128, 0.2);
+  border-left-color: rgba(74, 222, 128, 0.8);
 }
 
 .cr2-game-screen__action-item[data-kind='event'] {
-  border-color: rgba(167, 139, 250, 0.24);
+  border-left-color: rgba(167, 139, 250, 0.8);
 }
 
 .cr2-game-screen__command-stack {
@@ -541,52 +373,10 @@
   padding: 18px;
 }
 
-@keyframes cr2-rush-line {
-  0% {
-    opacity: 0;
-    transform: translateX(-36px) scaleX(0.35);
-  }
-  20% {
-    opacity: 0.88;
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(320px) scaleX(1);
-  }
-}
-
-@keyframes cr2-quality-pulse {
-  0%,
-  100% {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.5),
-      0 24px 38px rgba(0, 0, 0, 0.18),
-      0 0 0 0 rgba(240, 165, 0, 0.12);
-  }
-  50% {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.5),
-      0 24px 38px rgba(0, 0, 0, 0.18),
-      0 0 0 14px rgba(240, 165, 0, 0.08);
-  }
-}
-
-@keyframes cr2-wave-broadcast {
-  0% {
-    opacity: 0.55;
-    transform: scale(0.4);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.25);
-  }
-}
-
 @media (max-width: 1180px) {
   .cr2-game-screen__body {
     grid-template-columns: 1fr;
   }
-
   .cr2-game-screen__command-zone {
     grid-template-columns: 1fr;
   }
@@ -594,30 +384,25 @@
 
 @media (max-width: 900px) {
   .cr2-game-screen__arena {
-    min-height: 680px;
+    min-height: 500px;
     grid-template-columns: repeat(8, minmax(0, 1fr));
   }
-
   .cr2-game-screen__arena-hud--enemy {
     grid-column: 1 / span 6;
     margin-left: 14px;
   }
-
   .cr2-game-screen__arena-hud--player {
     grid-column: 3 / -1;
     margin-right: 14px;
   }
-
   .cr2-game-screen__support-rivals {
     grid-column: 5 / -1;
-    margin-top: 160px;
+    margin-top: 140px;
     margin-right: 14px;
   }
-
   .cr2-game-screen__sprite--enemy {
     grid-column: 5 / -1;
   }
-
   .cr2-game-screen__sprite--player {
     grid-column: 1 / span 4;
     margin-left: 22px;
@@ -628,50 +413,40 @@
   .cr2-game-screen__body {
     padding: 12px;
   }
-
   .cr2-game-screen__arena {
-    min-height: 620px;
-    border-radius: 22px;
+    min-height: 520px;
   }
-
   .cr2-game-screen__arena-overlay {
     padding: 12px;
   }
-
   .cr2-game-screen__arena-hud {
     width: 100%;
   }
-
   .cr2-game-screen__arena-hud--enemy,
   .cr2-game-screen__arena-hud--player {
     grid-column: 1 / -1;
     justify-self: stretch;
     margin: 0 12px;
   }
-
   .cr2-game-screen__support-rivals {
     grid-column: 1 / -1;
     justify-self: stretch;
-    margin: 164px 12px 0;
+    margin: 140px 12px 0;
   }
-
   .cr2-game-screen__sprite--enemy {
     grid-column: 4 / -1;
-    margin-bottom: 112px;
+    margin-bottom: 90px;
   }
-
   .cr2-game-screen__sprite--player {
     grid-column: 1 / span 4;
     margin-left: 12px;
   }
-
   .cr2-game-screen__sprite-badge {
-    width: 136px;
-    height: 136px;
+    width: 100px;
+    height: 100px;
   }
-
   .cr2-game-screen__player-emblem {
-    width: 116px;
-    height: 116px;
+    width: 90px;
+    height: 90px;
   }
 }

@@ -211,6 +211,70 @@
   gap: 6px;
 }
 
+.cr2-title-scene__account {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    var(--cr2-title-card-surface);
+}
+
+.cr2-title-scene__account-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.cr2-title-scene__account-label {
+  color: var(--cr2-title-text-soft);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cr2-title-scene__account-copy strong {
+  color: var(--cr2-title-text-strong);
+  font-size: 0.98rem;
+}
+
+.cr2-title-scene__account-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.cr2-title-scene__account-badge {
+  padding: 6px 10px;
+  border: 1px solid rgba(240, 165, 0, 0.22);
+  border-radius: 999px;
+  background: rgba(240, 165, 0, 0.1);
+  color: color-mix(in srgb, var(--cr2-title-accent) 84%, white);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.cr2-title-scene__logout {
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cr2-title-text-strong);
+  cursor: pointer;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+}
+
+.cr2-title-scene__logout:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--cr2-title-accent) 36%, rgba(255, 255, 255, 0.12));
+}
+
 .cr2-title-scene__menu-kicker {
   color: color-mix(in srgb, var(--cr2-title-accent) 68%, white);
   font-size: 0.78rem;
@@ -321,5 +385,15 @@
 
   .cr2-title-scene__brand h1 {
     font-size: clamp(2.6rem, 12vw, 3.8rem);
+  }
+
+  .cr2-title-scene__account {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cr2-title-scene__account-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 }

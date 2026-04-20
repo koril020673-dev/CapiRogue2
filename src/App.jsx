@@ -2,6 +2,7 @@ import { AdvisorSelectScreen } from './screens/AdvisorSelectScreen.jsx'
 import { GameOverScreen } from './screens/GameOverScreen.jsx'
 import { GameScreen } from './screens/GameScreen.jsx'
 import { HistoryScreen } from './screens/HistoryScreen.jsx'
+import { LoginScreen } from './screens/LoginScreen.jsx'
 import { SettingsScreen } from './screens/SettingsScreen.jsx'
 import { TitleScreen } from './screens/TitleScreen.jsx'
 import { useGameStore } from './store/useGameStore.js'
@@ -9,6 +10,10 @@ import { useGameStore } from './store/useGameStore.js'
 function App() {
   const screen = useGameStore((state) => state.screen)
   const gameStatus = useGameStore((state) => state.gameStatus)
+
+  if (screen === 'login') {
+    return <LoginScreen />
+  }
 
   if (screen === 'title') {
     return <TitleScreen />

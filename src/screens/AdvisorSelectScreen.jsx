@@ -60,6 +60,7 @@ function StatMeter({ label, value, hidden }) {
 
 export function AdvisorSelectScreen() {
   const advisorDraft = useGameStore((state) => state.advisorDraft ?? 'analyst')
+  const isAdmin = useGameStore((state) => state.auth?.isAdmin)
   const meta = useGameStore((state) => state.meta)
   const legacyCards = useGameStore((state) => state.legacyCards)
   const setAdvisorDraft = useGameStore((state) => state.setAdvisorDraft)
@@ -67,7 +68,7 @@ export function AdvisorSelectScreen() {
   const backToTitle = useGameStore((state) => state.backToTitle)
 
   const selected = ADVISORS[advisorDraft] ?? ADVISORS.analyst
-  const selectedUnlocked = isAdvisorUnlocked(selected.id, meta, legacyCards)
+  const selectedUnlocked = isAdmin || isAdvisorUnlocked(selected.id, meta, legacyCards)
 
   return (
     <main className="cr2-advisor-scene">
@@ -84,7 +85,7 @@ export function AdvisorSelectScreen() {
           <div className="cr2-advisor-scene__roster">
             {ADVISOR_ORDER.map((advisorId, index) => {
               const advisor = ADVISORS[advisorId]
-              const unlocked = isAdvisorUnlocked(advisorId, meta, legacyCards)
+              const unlocked = isAdmin || isAdvisorUnlocked(advisorId, meta, legacyCards)
 
               return (
                 <button

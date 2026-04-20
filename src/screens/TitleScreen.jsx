@@ -64,11 +64,14 @@ function MenuButton({ disabled = false, label, sublabel, onClick }) {
 }
 
 export function TitleScreen() {
+  const auth = useGameStore((state) => state.auth)
   const saveExists = useGameStore((state) => state.saveExists)
   const continueRun = useGameStore((state) => state.continueRun)
   const startNewGame = useGameStore((state) => state.startNewGame)
   const openHistoryScreen = useGameStore((state) => state.openHistoryScreen)
   const openSettingsScreen = useGameStore((state) => state.openSettingsScreen)
+  const logout = useGameStore((state) => state.logout)
+
   const activeStartScene = useMemo(
     () => START_SCENE_VARIANTS[Math.floor(Math.random() * START_SCENE_VARIANTS.length)],
     [],
@@ -114,7 +117,7 @@ export function TitleScreen() {
             <h1>CapiRogue 2</h1>
             <p className="cr2-title-scene__subtitle">경제 생존 로그라이크</p>
             <p className="cr2-title-scene__flavor">
-              무너지는 시장 위에서 버티고, 확장하고, 결국 판을 뒤집으세요.
+              무너지는 시장 안에서 버티고 확장하며, 경쟁사의 압박을 넘어 끝까지 살아남으세요.
             </p>
           </div>
 
@@ -129,13 +132,33 @@ export function TitleScreen() {
             </div>
             <div>
               <span>Current Save</span>
-              <strong>{saveExists ? '이어하기 가능' : '새 런 시작 가능'}</strong>
+              <strong>{saveExists ? '이어하기 가능' : '새 게임 필요'}</strong>
             </div>
           </div>
         </section>
 
         <aside className="cr2-title-scene__menu-panel">
           <div className="cr2-title-scene__menu-head">
+            <div className="cr2-title-scene__account">
+              <div className="cr2-title-scene__account-copy">
+                <span className="cr2-title-scene__account-label">Signed In</span>
+                <strong>{auth?.userId || 'Guest'}</strong>
+              </div>
+
+              <div className="cr2-title-scene__account-actions">
+                {auth?.isAdmin ? (
+                  <span className="cr2-title-scene__account-badge">ADMIN MODE</span>
+                ) : null}
+                <button
+                  type="button"
+                  className="cr2-title-scene__logout"
+                  onClick={logout}
+                >
+                  로그아웃
+                </button>
+              </div>
+            </div>
+
             <p className="cr2-title-scene__menu-kicker">Main Menu</p>
             <h2>시작 화면</h2>
           </div>
@@ -149,7 +172,7 @@ export function TitleScreen() {
             />
             <MenuButton
               label="새 게임"
-              sublabel="어드바이저를 고르고 새로운 런을 시작합니다."
+              sublabel="어드바이저를 선택하고 새로운 런을 시작합니다."
               onClick={startNewGame}
             />
             <MenuButton
@@ -159,14 +182,14 @@ export function TitleScreen() {
             />
             <MenuButton
               label="설정"
-              sublabel="사운드, 텍스트, 인터페이스 옵션을 조정합니다."
+              sublabel="사운드와 텍스트, 인터페이스 옵션을 조정합니다."
               onClick={openSettingsScreen}
             />
           </div>
 
           <div className="cr2-title-scene__menu-foot">
             <span>v2 Rebuild</span>
-            <span>Random Key Art</span>
+            <span>{auth?.isAdmin ? 'Admin Sandbox Ready' : 'Random Key Art'}</span>
           </div>
         </aside>
       </div>

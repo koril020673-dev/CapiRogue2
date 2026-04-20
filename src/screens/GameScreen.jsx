@@ -3,6 +3,7 @@ import auraLogo from '../../RivalRogoImages/aura.png'
 import megaflexLogo from '../../RivalRogoImages/megaflex.png'
 import memecatchLogo from '../../RivalRogoImages/mimCatch.png'
 import nexuscoreLogo from '../../RivalRogoImages/nexuscore.png'
+import { AdminConsole } from '../components/AdminConsole.jsx'
 import { AdvisorBubble } from '../components/AdvisorBubble.jsx'
 import { BlackSwanModal } from '../components/BlackSwanModal.jsx'
 import { EconBanner } from '../components/EconBanner.jsx'
@@ -154,19 +155,6 @@ export function GameScreen() {
             data-strategy={selectedStrategyId ?? 'idle'}
             data-order={selectedOrderTier ?? 'idle'}
           >
-            <div className="cr2-game-screen__arena-backdrop" />
-            <div className="cr2-game-screen__arena-scanlines" />
-            <div className="cr2-game-screen__action-burst" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </div>
-            <div className="cr2-game-screen__signal-waves" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </div>
-
             <div className="cr2-game-screen__arena-overlay">
               <EconBanner />
               <AdvisorBubble />
@@ -245,10 +233,6 @@ export function GameScreen() {
               </div>
             </div>
 
-            <div className="cr2-game-screen__stage">
-              <span className="cr2-game-screen__stage-ring cr2-game-screen__stage-ring--enemy" />
-              <span className="cr2-game-screen__stage-ring cr2-game-screen__stage-ring--player" />
-            </div>
           </section>
 
           <section className="cr2-game-screen__command-zone">
@@ -298,6 +282,7 @@ export function GameScreen() {
       <SettlementModal />
       <ShopScreen />
       <BlackSwanModal />
+      <AdminConsole />
     </div>
   )
 }

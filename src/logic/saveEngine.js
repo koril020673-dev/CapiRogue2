@@ -1,6 +1,7 @@
 const SAVE_SLOT_KEY = 'cr2_save_slot'
 const HISTORY_KEY = 'cr2_history'
 const SETTINGS_KEY = 'cr2_settings'
+const AUTH_KEY = 'cr2_auth'
 
 const DEFAULT_SETTINGS = {
   bgmVolume: 0.6,
@@ -83,4 +84,44 @@ export function hasSaveSlot() {
 
 export function getDefaultSettings() {
   return { ...DEFAULT_SETTINGS }
+}
+
+export function loadAuthSession() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null')
+    if (!parsed || typeof parsed !== 'object') {
+      return { isLoggedIn: false, isAdmin: false, userId: '' }
+    }
+
+    return {
+      isLoggedIn: Boolean(parsed.isLoggedIn),
+      isAdmin: Boolean(parsed.isAdmin),
+      userId: parsed.userId ?? '',
+    }
+  } catch {
+    return { isLoggedIn: false, isAdmin: false, userId: '' }
+  }
+}
+
+export function saveAuthSession(auth) {
+  try {
+    localStorage.setItem(
+      AUTH_KEY,
+      JSON.stringify({
+        isLoggedIn: Boolean(auth?.isLoggedIn),
+        isAdmin: Boolean(auth?.isAdmin),
+        userId: auth?.userId ?? '',
+      }),
+    )
+  } catch {
+    // Ignore storage write errors.
+  }
+}
+
+export function clearAuthSession() {
+  try {
+    localStorage.removeItem(AUTH_KEY)
+  } catch {
+    // Ignore storage write errors.
+  }
 }
