@@ -1,27 +1,19 @@
 import { create } from 'zustand'
 import { ADVISORS } from '../constants/advisors.js'
-import { BLACK_SWANS } from '../constants/blackSwans.js'
+import { getConsumerGroupRatios } from '../constants/consumerGroups.js'
 import { drawWeightedEventCards, getEventCardById } from '../constants/docEvents.js'
-import { ECO_DISPLAY, ECO_WEIGHTS } from '../constants/economy.js'
-import { ECONOMIC_WARS } from '../constants/economicWars.js'
-import { getEducationHint } from '../constants/educationHints.js'
 import { LEGACY_CONDITIONS } from '../constants/legacy.js'
 import { CREDIT_SHOP } from '../constants/rewards.js'
-import {
-  RIVAL_NAMES,
-  RIVALS,
-  RIVAL_ORDER,
-  createInitialRivals,
-} from '../constants/rivals.js'
-import {
-  ORDER_TIERS,
-  STRATEGIES,
-  VENDOR,
-  VENDOR_MODE_MUL,
-} from '../constants/strategies.js'
-import { clamp, roundTo } from '../lib/gameMath.js'
+import { createInitialRivals } from '../constants/rivals.js'
+import { ORDER_TIERS, STRATEGIES, VENDOR } from '../constants/strategies.js'
+import { clamp } from '../lib/gameMath.js'
+import { applyStrategyEffect, previewStrategyEffect } from '../logic/brandQualityEngine.js'
 import { getCreditShopPrice } from '../logic/creditEngine.js'
-import { calcDemand } from '../logic/demandEngine.js'
+import {
+  calcDemand,
+  calcDemandEstimate,
+  calcGroupDemandBreakdown,
+} from '../logic/demandEngine.js'
 import { advanceEconPhase } from '../logic/econEngine.js'
 import { applyHealth, calcHealthDelta } from '../logic/healthEngine.js'
 import { calcAttraction } from '../logic/marketEngine.js'
@@ -34,16 +26,18 @@ import {
 import { getMomentumEffect, updateMomentum } from '../logic/momentumEngine.js'
 import { createRewardDraft } from '../logic/rewardEngine.js'
 import {
-  applyRivalHealthDamage,
   applyShareDamage,
-  calcRivalShares,
+  buildRivalPlayers,
   ensureRivalsJoined,
+  getActiveRivals,
+  getBiggestRival,
+  rotateBankruptRivals,
   updateRivalsFromSettlement,
 } from '../logic/rivalEngine.js'
 import {
   appendRunHistory,
-  clearSaveSlot,
   clearAuthSession,
+  clearSaveSlot,
   hasSaveSlot,
   loadAuthSession,
   loadRunHistory,
@@ -54,6 +48,7 @@ import {
   saveSettings,
 } from '../logic/saveEngine.js'
 import { calcSettlement } from '../logic/settlementEngine.js'
+import { getEducationHint } from '../constants/educationHints.js'
 
 const MAX_HEALTH = 10
 const FIXED_DIFFICULTY = {
@@ -62,11 +57,11 @@ const FIXED_DIFFICULTY = {
   interestRate: 0.072,
 }
 
-const RIVAL_JOIN_TOAST = {
-  megaflex: '새 경쟁사의 그림자 · 메가플렉스가 저가 공세를 시작했습니다.',
-  aura: '시장 신호 감지 · 아우라가 프리미엄 전선에 합류했습니다.',
-  memecatch: '트렌드 급부상 · 밈캐치가 변칙 마케팅으로 난입했습니다.',
-  nexuscore: '기술 파고 접근 · 넥서스코어가 고급 시장에 진입했습니다.',
+const EMPTY_GROUP_SHARES = {
+  quality: 0,
+  brand: 0,
+  value: 0,
+  general: 0,
 }
 
 function createToast(message, tone = 'neutral') {
@@ -81,20 +76,18 @@ function getWarningAlerts(state) {
   const alerts = []
   const fixedCostProxy = Math.max(
     1,
-    state.monthlyFixedCost +
-      (state.realty === 'monthly' ? 1000000 : 0) +
-      (state.factory.built && state.factory.safetyOn ? 5000000 : 0),
+    state.monthlyFixedCost + (state.realty === 'monthly' ? 1000000 : 0),
   )
   const recentLosses = state.profitHistory.slice(-3)
   const hasThreeStraightLosses =
     recentLosses.length === 3 && recentLosses.every((profit) => profit < 0)
 
   if (state.capital < fixedCostProxy * 2) {
-    alerts.push('⚠ 현금 부족 경고')
+    alerts.push('⚠️ 현금 부족 경고')
   }
 
   if (hasThreeStraightLosses) {
-    alerts.push('⚠ 3연속 적자')
+    alerts.push('⚠️ 3연속 적자')
   }
 
   if (state.companyHealth <= 3) {
@@ -142,25 +135,37 @@ function nextEffectList(activeEffects = []) {
           ? effect.turnsLeft
           : effect.turnsLeft - 1,
     }))
-    .filter((effect) => effect.turnsLeft === undefined || effect.turnsLeft === null || effect.turnsLeft > 0)
+    .filter(
+      (effect) =>
+        effect.turnsLeft === undefined || effect.turnsLeft === null || effect.turnsLeft > 0,
+    )
+}
+
+function consumeSingleEffect(activeEffects = [], type) {
+  let consumed = false
+  return activeEffects.filter((effect) => {
+    if (!consumed && effect.type === type) {
+      consumed = true
+      return false
+    }
+    return true
+  })
 }
 
 function createEventContext(state) {
-  const economyPhase =
-    state.econPhase === 'growth'
-      ? 'recovery'
-      : state.econPhase === 'contraction' || state.econPhase === 'recession'
-        ? 'slowdown'
-        : state.econPhase === 'stable'
-          ? 'steady'
-          : 'boom'
-
   return {
-    economyPhase,
+    economyPhase:
+      state.econPhase === 'growth'
+        ? 'recovery'
+        : state.econPhase === 'contraction' || state.econPhase === 'recession'
+          ? 'slowdown'
+          : state.econPhase === 'stable'
+            ? 'steady'
+            : 'boom',
     debtBand:
       state.debt > state.capital * 0.5 ? 'high' : state.debt > state.capital * 0.2 ? 'medium' : 'low',
     factoryCount: state.factory.built ? 1 : 0,
-    activeRivals: RIVAL_ORDER.filter((rivalId) => state.rivals?.[rivalId]?.active),
+    activeRivals: getActiveRivals(state.rivals).map((rival) => rival.id),
     month: state.floor,
   }
 }
@@ -204,16 +209,15 @@ function createBaseState() {
 
   return {
     screen: auth.isLoggedIn ? 'title' : 'login',
+    gameStatus: 'idle',
     floor: 1,
     maxFloors: 120,
-    gameStatus: 'idle',
     floorPhase: 'normal',
+    floorStage: 'market',
     auth,
     loginError: '',
     advisor: null,
     advisorDraft: null,
-    difficulty: 'fixed',
-    difficultyDraft: 'fixed',
     companyHealth: 10,
     maxHealth: MAX_HEALTH,
     momentum: 0,
@@ -231,6 +235,7 @@ function createBaseState() {
     qualityScore: 60,
     priceResistance: 0,
     marketing: { awarenessBonus: 0 },
+    vendor: VENDOR,
     factory: {
       built: false,
       buildTurnsLeft: 0,
@@ -238,14 +243,18 @@ function createBaseState() {
       accidentRisk: 0,
       upgradeLevel: 0,
     },
+    selectedStrategyId: null,
+    selectedOrderTier: null,
+    currentEventCardId: null,
+    currentEventResolved: false,
+    currentEventChoiceId: null,
+    lastEventResult: null,
     rivals: createInitialRivals(),
     activeEconomicWar: null,
     activeBlackSwan: null,
-    blackSwanSeen: false,
     activeEffects: [],
+    blackSwanSeen: false,
     lastSettlement: null,
-    settlementModalOpen: false,
-    shopScreenOpen: false,
     profitHistory: [],
     cumulativeProfit: 0,
     legacyCards,
@@ -255,239 +264,73 @@ function createBaseState() {
     saveExists,
     advisorFeeTotal: 0,
     warWinCount: 0,
-    currentEventCardId: null,
-    currentEventResolved: false,
-    currentEventChoiceId: null,
-    lastEventResult: null,
-    selectedStrategyId: null,
-    selectedOrderTier: null,
     rewardPending: null,
     rewardSelection: null,
     rewardClaimed: false,
-    shopOpen: false,
     shopPurchasesThisFloor: [],
     warningAlerts: [],
     toasts: [],
     decisionLog: [],
     peakMarketShare: 0,
-    warPaused: false,
     previewOpen: false,
+    consumerGroupRatios: getConsumerGroupRatios('stable'),
+    lastGroupShares: { ...EMPTY_GROUP_SHARES },
+    lastLeftoverDemand: 0,
   }
 }
 
-function getEconomicWarStateForFloor(floor, rivals) {
-  const activeEntry = Object.entries(ECONOMIC_WARS)
-    .map(([startFloor, war]) => ({
-      startFloor: Number(startFloor),
-      war,
-    }))
-    .sort((left, right) => right.startFloor - left.startFloor)
-    .find(({ startFloor, war }) => {
-      if (floor < startFloor) {
-        return false
-      }
-
-      if (war.duration === 'until clear') {
-        return true
-      }
-
-      return floor < startFloor + war.duration
-    })
-
-  if (!activeEntry) {
-    return null
-  }
-
-  const { startFloor, war } = activeEntry
-  const rivalIds =
-    war.rival === 'all'
-      ? RIVAL_ORDER.filter((rivalId) => rivals[rivalId]?.active)
-      : [war.rival]
-
-  return {
-    warId: war.id,
-    name: war.name,
-    rivalIds,
-    duration: war.duration,
-    floorsLeft:
-      war.duration === 'until clear'
-        ? 999
-        : Math.max(0, war.duration - Math.max(0, floor - startFloor)),
-  }
-}
-
-function createRunState({ advisor, meta, legacyCards, settings, playHistory, saveExists }) {
+function createRunState({ advisor, meta, legacyCards, settings, playHistory }) {
   const base = applyLegacyBonuses(
     {
       ...createBaseState(),
       screen: 'game',
+      gameStatus: 'playing',
+      floorStage: 'market',
       advisor,
       advisorDraft: advisor,
-      difficulty: 'fixed',
-      difficultyDraft: 'fixed',
-      gameStatus: 'playing',
-      capital: FIXED_DIFFICULTY.capital,
-      debt: FIXED_DIFFICULTY.debt,
-      interestRate: FIXED_DIFFICULTY.interestRate,
-      companyHealth:
-        advisor === 'strategist'
-          ? MAX_HEALTH
-          : advisor === 'actuary'
-            ? MAX_HEALTH
-            : 10,
       meta,
       legacyCards,
       settings,
       playHistory,
-      saveExists,
-      priceResistance:
-        (advisor === 'trader' ? 0.01 : 0) +
-        (advisor === 'auditor' ? 0 : 0),
-      qualityScore: 60,
+      saveExists: true,
+      consumerGroupRatios: getConsumerGroupRatios('stable'),
     },
     legacyCards,
   )
 
-  const next = {
-    ...base,
-    currentEventCardId: null,
-    warningAlerts: [],
-  }
-
-  next.rivals = ensureRivalsJoined(next.rivals, 1, next.industryTier)
-  next.currentEventCardId = drawCurrentEvent({
-    ...next,
-    rivals: next.rivals,
-  })
-  next.warningAlerts = getWarningAlerts(next)
-
-  return next
-}
-
-function composeTurnPlan(state, strategyId, orderTierId = state.selectedOrderTier) {
-  const strategy = STRATEGIES[strategyId]
-  const orderTier = ORDER_TIERS[orderTierId]
-  if (!strategy || !orderTier) {
-    return null
-  }
-
-  const vendorMode = VENDOR_MODE_MUL[strategy.vendorMode]
-  const baseUnitCost = VENDOR.baseUnitCost * vendorMode.costMul
-  const tempCostMul = getEffectValue(state, 'tempCostMul')
-  const vendorUnitCost = Math.round(baseUnitCost * (1 + tempCostMul))
-  const factoryDiscount = state.factory.built ? 0.6 : 1
-  const qualityMul =
-    strategy.qualityMode === 'budget'
-      ? 0.8
-      : strategy.qualityMode === 'premium'
-        ? 1.5
-        : 1
-  const predictedDemand = Math.round(
-    1000 *
-      (ECO_WEIGHTS[state.itemCategory]?.[state.econPhase] ?? 1) *
-      (1 + getMomentumEffect(state.momentum).demandMul) *
-      (state.activeBlackSwan?.demandMul ?? 1) *
-      (1 + getEffectValue(state, 'demandMul')),
-  )
-  const [minimumOrderMul, maximumOrderMul] = strategy.orderRange
-  const midpointOrderMul = roundTo((minimumOrderMul + maximumOrderMul) / 2, 2)
-  const orderMultipliers = [minimumOrderMul, midpointOrderMul, maximumOrderMul]
-  const chosenOrderMul = orderMultipliers[orderTier.index] ?? midpointOrderMul
+  const rivals = ensureRivalsJoined(base.rivals, 1)
+  const currentEventCardId = drawCurrentEvent({ ...base, rivals })
 
   return {
-    strategyId,
-    orderTierId,
-    orderQty: Math.max(25, Math.round(predictedDemand * chosenOrderMul)),
-    sellPrice: Math.round(vendorUnitCost * strategy.priceMul),
-    vendorUnitCost,
-    qualityMode: strategy.qualityMode,
-    vendorMode: strategy.vendorMode,
-    previewUnitCost: Math.round(vendorUnitCost * qualityMul * factoryDiscount),
-    quality:
-      VENDOR.baseQuality +
-      vendorMode.qualityBonus +
-      state.qualityScore +
-      (strategy.qualityMode === 'premium' ? 20 : 0),
-    awareness:
-      (state.marketing?.awarenessBonus ?? 0) + Number(strategy.awarenessBonus ?? 0),
-    predictedDemand,
-    orderMultipliers,
+    ...base,
+    rivals,
+    currentEventCardId,
+    warningAlerts: getWarningAlerts({ ...base, rivals }),
   }
 }
 
-function applyEventEffects(state, effects = {}) {
-  const nextState = {
-    ...state,
-    capital: state.capital + (effects.capitalDelta ?? 0) * 1000000,
-    debt: Math.max(0, state.debt + (effects.debtDelta ?? 0) * 1000000),
-    brandValue: state.brandValue + (effects.brandDelta ?? 0),
-    qualityScore: state.qualityScore + (effects.qualityDelta ?? 0),
-    marketing: {
-      ...state.marketing,
-      awarenessBonus: clamp(
-        (state.marketing?.awarenessBonus ?? 0) + (effects.awarenessDelta ?? 0),
-        0,
-        0.5,
-      ),
-    },
-    activeEffects: [...(state.activeEffects ?? [])],
-  }
+function buildSaveSnapshot(state) {
+  const { auth, loginError, toasts, ...persisted } = state
 
-  if (effects.demandMul) {
-    nextState.activeEffects.push({
-      id: `demand-${Date.now()}`,
-      type: 'demandMul',
-      value: effects.demandMul,
-      turnsLeft: effects.turnsLeft ?? 1,
-    })
+  return {
+    ...persisted,
+    screen: 'game',
+    saveExists: true,
   }
-
-  if (effects.healthDelta) {
-    nextState.companyHealth = applyHealth(
-      nextState.companyHealth,
-      effects.healthDelta,
-      nextState.maxHealth,
-    )
-  }
-
-  return nextState
 }
 
-function applyRewardEffect(state, reward) {
-  const nextState = {
-    ...state,
-    credits: state.credits + (reward.effect?.credits ?? 0),
-    brandValue: state.brandValue + (reward.effect?.brandValue ?? 0),
-    qualityScore: state.qualityScore + (reward.effect?.qualityScore ?? 0),
-    priceResistance: state.priceResistance + (reward.effect?.priceResistance ?? 0),
-    capital:
-      reward.effect?.capitalMul
-        ? Math.round(state.capital * (1 + reward.effect.capitalMul))
-        : state.capital,
-    monthlyFixedCost:
-      reward.effect?.fixedCostMul
-        ? Math.round(state.monthlyFixedCost * (1 + reward.effect.fixedCostMul))
-        : state.monthlyFixedCost,
-    interestRate:
-      reward.effect?.interestRateMul
-        ? state.interestRate * (1 + reward.effect.interestRateMul)
-        : state.interestRate,
-    companyHealth: reward.effect?.fullHeal
-      ? state.maxHealth
-      : applyHealth(state.companyHealth, reward.effect?.companyHealth ?? 0, state.maxHealth),
-    activeEffects: [...(state.activeEffects ?? [])],
+function buildHistoryEntry(state, status) {
+  const latestLegacy = state.legacyCards?.[state.legacyCards.length - 1]
+  return {
+    id: `${Date.now()}-${state.floor}`,
+    advisor: state.advisor,
+    advisorName: ADVISORS[state.advisor]?.name ?? state.advisor,
+    floor: state.floor,
+    result: status,
+    netWorth: state.capital - state.debt,
+    legacyCard: latestLegacy?.name ?? latestLegacy?.label ?? null,
+    createdAt: new Date().toISOString(),
   }
-
-  if (reward.effect?.tempCostMul) {
-    nextState.activeEffects.push({
-      id: `temp-cost-${Date.now()}`,
-      type: 'tempCostMul',
-      value: reward.effect.tempCostMul,
-      turnsLeft: reward.effect.turnsLeft ?? 1,
-    })
-  }
-
-  return nextState
 }
 
 function resolveLegacyCards(state, status) {
@@ -514,65 +357,211 @@ function resolveLegacyCards(state, status) {
   return nextCards
 }
 
-function maybeStartEconomicWar(state) {
-  const war = ECONOMIC_WARS[state.floor]
-  if (!war) {
-    return state.activeEconomicWar
+function applyEventEffects(state, effects = {}) {
+  const nextState = {
+    ...state,
+    capital: state.capital + (effects.capitalDelta ?? 0) * 1000000,
+    debt: Math.max(0, state.debt + (effects.debtDelta ?? 0) * 1000000),
+    brandValue: state.brandValue + (effects.brandDelta ?? 0),
+    qualityScore: state.qualityScore + (effects.qualityDelta ?? 0),
+    marketing: {
+      ...state.marketing,
+      awarenessBonus: clamp(
+        (state.marketing?.awarenessBonus ?? 0) + (effects.awarenessDelta ?? 0),
+        0,
+        0.5,
+      ),
+    },
+    activeEffects: [...(state.activeEffects ?? [])],
   }
 
-  const rivalIds =
-    war.rival === 'all'
-      ? RIVAL_ORDER.filter((rivalId) => state.rivals[rivalId]?.active)
-      : [war.rival]
-
-  return {
-    warId: war.id,
-    name: war.name,
-    rivalIds,
-    duration: war.duration,
-    floorsLeft: war.duration === 'until clear' ? 999 : war.duration,
+  if (effects.demandMul) {
+    nextState.activeEffects.push({
+      id: `effect-demand-${Date.now()}`,
+      type: 'demandMul',
+      value: effects.demandMul,
+      turnsLeft: effects.turnsLeft ?? 1,
+    })
   }
+
+  if (effects.healthDelta) {
+    nextState.companyHealth = applyHealth(
+      nextState.companyHealth,
+      effects.healthDelta,
+      nextState.maxHealth,
+    )
+  }
+
+  return nextState
 }
 
-function maybeTriggerBlackSwan(state) {
-  if (state.activeBlackSwan || state.floor < 80) {
-    return state.activeBlackSwan
+function applyRewardEffect(state, reward) {
+  const nextState = {
+    ...state,
+    credits: state.credits + (reward.effect?.credits ?? 0),
+    brandValue: state.brandValue + (reward.effect?.brandValue ?? 0),
+    qualityScore: state.qualityScore + (reward.effect?.qualityScore ?? 0),
+    priceResistance: state.priceResistance + (reward.effect?.priceResistance ?? 0),
+    capital:
+      reward.effect?.capitalMul != null
+        ? Math.round(state.capital * (1 + reward.effect.capitalMul))
+        : state.capital,
+    monthlyFixedCost:
+      reward.effect?.fixedCostMul != null
+        ? Math.round(state.monthlyFixedCost * (1 + reward.effect.fixedCostMul))
+        : state.monthlyFixedCost,
+    interestRate:
+      reward.effect?.interestRateMul != null
+        ? state.interestRate * (1 + reward.effect.interestRateMul)
+        : state.interestRate,
+    companyHealth: reward.effect?.fullHeal
+      ? state.maxHealth
+      : applyHealth(state.companyHealth, reward.effect?.companyHealth ?? 0, state.maxHealth),
+    activeEffects: [...(state.activeEffects ?? [])],
   }
 
-  const probability = 0.01 + Math.max(0, state.floor - 80) * 0.001
-  if (Math.random() >= probability) {
+  if (reward.effect?.tempCostMul) {
+    nextState.activeEffects.push({
+      id: `temp-cost-${Date.now()}`,
+      type: 'tempCostMul',
+      value: reward.effect.tempCostMul,
+      turnsLeft: reward.effect.turnsLeft ?? 1,
+    })
+  }
+
+  return nextState
+}
+
+function getOrderMultipliers(strategyId) {
+  const strategy = STRATEGIES[strategyId]
+  if (!strategy) {
+    return [0.4, 0.6, 0.8]
+  }
+
+  const [minimumOrderMul, maximumOrderMul] = strategy.orderRange
+  return [
+    minimumOrderMul,
+    (minimumOrderMul + maximumOrderMul) / 2,
+    maximumOrderMul,
+  ]
+}
+
+function composeTurnPlan(state, strategyId, orderTierId = state.selectedOrderTier) {
+  const strategy = STRATEGIES[strategyId]
+  const orderTier = ORDER_TIERS[orderTierId]
+  if (!strategy || !orderTier) {
     return null
   }
 
-  const picked = BLACK_SWANS[Math.floor(Math.random() * BLACK_SWANS.length)]
+  const momentumMul = 1 + getMomentumEffect(state.momentum).demandMul
+  const blackSwanMul = state.activeBlackSwan?.demandMul ?? 1
+  const eventMul = 1 + getEffectValue(state, 'demandMul')
+  const demandEstimate = calcDemandEstimate({
+    category: state.itemCategory,
+    econPhase: state.econPhase,
+    industryTier: state.industryTier,
+    momentumMul,
+    blackSwanMul,
+    eventMul,
+  })
+
+  const vendorUnitCost = Math.round(
+    VENDOR.baseUnitCost * (1 + getEffectValue(state, 'tempCostMul')),
+  )
+  const orderMul = getOrderMultipliers(strategyId)[orderTier.index] ?? 1
+  const orderCapMul = strategy.effect?.orderCapMul ?? 1
+  const orderQty = Math.max(12, Math.round(demandEstimate * orderMul * orderCapMul))
+  const sellPrice = Math.max(
+    10000,
+    Math.round(vendorUnitCost * (strategy.effect?.priceMul ?? strategy.sellPriceMul ?? 1)),
+  )
+
   return {
-    ...picked,
-    floorsLeft: picked.duration,
+    strategyId,
+    orderTierId,
+    qualityMode: strategy.qualityMode,
+    orderQty,
+    sellPrice,
+    vendorUnitCost,
+    previewUnitCost: Math.round(
+      vendorUnitCost *
+        (strategy.qualityMode === 'premium' ? 1.5 : strategy.qualityMode === 'budget' ? 0.8 : 1) *
+        (state.factory.built ? 0.6 : 1),
+    ),
+    demandEstimate,
   }
 }
 
-function buildSaveSnapshot(state) {
-  const { auth, loginError, ...persisted } = state
+function buildPlayerEntry(state, plan, strategyState) {
+  const qualityAdjustment =
+    plan.qualityMode === 'premium' ? 12 : plan.qualityMode === 'budget' ? -8 : 0
+
+  const qualityScore = Math.max(0, strategyState.qualityScore + qualityAdjustment)
+  const brandValue = Math.max(0, strategyState.brandValue)
+  const attraction = calcAttraction({
+    quality: qualityScore,
+    brand: brandValue,
+    sellPrice: plan.sellPrice,
+    resistance: state.priceResistance,
+    category: state.itemCategory,
+    econPhase: state.econPhase,
+    awarenessBonus: state.marketing.awarenessBonus,
+  })
 
   return {
-    ...persisted,
-    screen: 'game',
-    saveExists: true,
-    toasts: [],
+    id: 'player',
+    qualityScore,
+    brandValue,
+    sellPrice: plan.sellPrice,
+    attraction,
   }
 }
 
-function buildHistoryEntry(state, status) {
-  const latestLegacy = state.legacyCards?.[state.legacyCards.length - 1]
+function buildDemandRatioMultipliers(strategyId) {
+  if (strategyId === 'dumping') {
+    return { value: 1.2 }
+  }
+
+  return {}
+}
+
+function prepareNextFloorState(state, { keepEffects = true } = {}) {
+  const base = {
+    ...state,
+    floorStage: 'market',
+    lastSettlement: null,
+    currentEventResolved: false,
+    currentEventChoiceId: null,
+    lastEventResult: null,
+    selectedStrategyId: null,
+    selectedOrderTier: null,
+    rewardPending: null,
+    rewardSelection: null,
+    rewardClaimed: false,
+    shopPurchasesThisFloor: [],
+    previewOpen: false,
+    currentEventCardId: null,
+    activeEffects: keepEffects ? state.activeEffects : [],
+  }
+
+  let nextEffects = base.activeEffects
+  if (hasEffect(base, 'rerollEvent')) {
+    const firstPick = drawCurrentEvent({ ...base, activeEffects: nextEffects })
+    const secondPick = drawCurrentEvent({
+      ...base,
+      currentEventCardId: firstPick,
+      activeEffects: nextEffects,
+    })
+    base.currentEventCardId = secondPick ?? firstPick
+    nextEffects = consumeSingleEffect(nextEffects, 'rerollEvent')
+  } else {
+    base.currentEventCardId = drawCurrentEvent(base)
+  }
+
   return {
-    id: `${Date.now()}-${state.floor}`,
-    advisor: state.advisor,
-    advisorName: ADVISORS[state.advisor]?.name ?? state.advisor,
-    floor: state.floor,
-    result: status,
-    netWorth: state.capital - state.debt,
-    legacyCard: latestLegacy?.name ?? latestLegacy?.label ?? null,
-    createdAt: new Date().toISOString(),
+    ...base,
+    activeEffects: nextEffects,
+    warningAlerts: getWarningAlerts(base),
   }
 }
 
@@ -642,10 +631,6 @@ export const useGameStore = create((set, get) => {
         },
         loginError: '',
         screen: 'login',
-        shopOpen: false,
-        previewOpen: false,
-        settlementModalOpen: false,
-        shopScreenOpen: false,
         toasts: [],
       }))
     },
@@ -674,6 +659,19 @@ export const useGameStore = create((set, get) => {
         screen: 'settings',
       })),
 
+    updateSettings: (partialSettings) =>
+      set((state) => {
+        const nextSettings = {
+          ...state.settings,
+          ...partialSettings,
+        }
+        saveSettings(nextSettings)
+        return {
+          ...state,
+          settings: nextSettings,
+        }
+      }),
+
     startNewGame: () =>
       set((state) => ({
         ...state,
@@ -694,8 +692,9 @@ export const useGameStore = create((set, get) => {
       }
 
       set((state) => ({
-        ...state,
+        ...createBaseState(),
         ...saved,
+        auth: state.auth,
         screen: 'game',
         gameStatus: 'playing',
         saveExists: true,
@@ -705,135 +704,11 @@ export const useGameStore = create((set, get) => {
       }))
     },
 
-    updateSettings: (partialSettings) =>
-      set((state) => {
-        const nextSettings = {
-          ...state.settings,
-          ...partialSettings,
-        }
-        saveSettings(nextSettings)
-        return {
-          ...state,
-          settings: nextSettings,
-        }
-      }),
-
     setAdvisorDraft: (advisorId) =>
       set((state) => ({
         ...state,
         advisorDraft: advisorId,
       })),
-
-    adminJumpToFloor: (targetFloor) => {
-      const state = get()
-      if (!state.auth?.isAdmin || state.gameStatus !== 'playing') {
-        return
-      }
-
-      const nextFloor = clamp(Math.round(Number(targetFloor) || 1), 1, state.maxFloors)
-      let nextRivals = createInitialRivals()
-
-      for (let floorIndex = 2; floorIndex <= nextFloor; floorIndex += 1) {
-        nextRivals = ensureRivalsJoined(nextRivals, floorIndex, state.industryTier)
-      }
-
-      const activeEconomicWar = getEconomicWarStateForFloor(nextFloor, nextRivals)
-      const draftState = {
-        ...state,
-        floor: nextFloor,
-        rivals: nextRivals,
-        activeEconomicWar,
-        activeBlackSwan: null,
-        blackSwanSeen: false,
-        settlementModalOpen: false,
-        shopScreenOpen: false,
-        selectedStrategyId: null,
-        selectedOrderTier: null,
-        currentEventResolved: false,
-        currentEventChoiceId: null,
-        lastEventResult: null,
-        lastSettlement: null,
-        rewardPending: null,
-        rewardSelection: null,
-        rewardClaimed: false,
-        shopOpen: false,
-        shopPurchasesThisFloor: [],
-        warningAlerts: [],
-      }
-
-      const currentEventCardId = drawCurrentEvent(draftState)
-      const finalState = {
-        ...draftState,
-        currentEventCardId,
-        warningAlerts: getWarningAlerts({
-          ...draftState,
-          currentEventCardId,
-        }),
-        floorPhase: activeEconomicWar ? 'economic-war' : 'normal',
-      }
-
-      set(finalState)
-      saveSaveSlot(buildSaveSnapshot(finalState))
-      enqueueToast(`${nextFloor}층 체크포인트로 이동했습니다.`, 'warning')
-    },
-
-    adminGrantCapital: (amount) => {
-      const state = get()
-      if (!state.auth?.isAdmin || state.gameStatus !== 'playing') {
-        return
-      }
-
-      const nextCapital = Math.max(0, state.capital + Math.round(Number(amount) || 0))
-      const nextState = {
-        ...state,
-        capital: nextCapital,
-        warningAlerts: getWarningAlerts({
-          ...state,
-          capital: nextCapital,
-        }),
-      }
-
-      set(nextState)
-      saveSaveSlot(buildSaveSnapshot(nextState))
-      enqueueToast(`현금 ${Math.round(Number(amount) || 0).toLocaleString()}원을 지급했습니다.`, 'positive')
-    },
-
-    adminGrantCredits: (amount) => {
-      const state = get()
-      if (!state.auth?.isAdmin || state.gameStatus !== 'playing') {
-        return
-      }
-
-      const nextCredits = Math.max(0, state.credits + Math.round(Number(amount) || 0))
-      const nextState = {
-        ...state,
-        credits: nextCredits,
-      }
-
-      set(nextState)
-      saveSaveSlot(buildSaveSnapshot(nextState))
-      enqueueToast(`크레딧 ${Math.round(Number(amount) || 0)}C를 지급했습니다.`, 'positive')
-    },
-
-    adminHealCompany: () => {
-      const state = get()
-      if (!state.auth?.isAdmin || state.gameStatus !== 'playing') {
-        return
-      }
-
-      const nextState = {
-        ...state,
-        companyHealth: state.maxHealth,
-        warningAlerts: getWarningAlerts({
-          ...state,
-          companyHealth: state.maxHealth,
-        }),
-      }
-
-      set(nextState)
-      saveSaveSlot(buildSaveSnapshot(nextState))
-      enqueueToast('회사 체력을 최대로 회복했습니다.', 'positive')
-    },
 
     confirmAdvisor: () => {
       const state = get()
@@ -847,7 +722,6 @@ export const useGameStore = create((set, get) => {
         legacyCards: state.legacyCards,
         settings: state.settings,
         playHistory: state.playHistory,
-        saveExists: true,
       })
 
       set({
@@ -874,7 +748,6 @@ export const useGameStore = create((set, get) => {
         legacyCards: state.legacyCards,
         settings: state.settings,
         playHistory: state.playHistory,
-        saveExists: true,
       })
 
       set({
@@ -897,6 +770,34 @@ export const useGameStore = create((set, get) => {
         advisorDraft: state.advisor ?? 'analyst',
       })),
 
+    setFloorStage: (floorStage) =>
+      set((state) => ({
+        ...state,
+        floorStage,
+      })),
+
+    goToCompanyStage: () =>
+      set((state) => ({
+        ...state,
+        floorStage: 'company',
+      })),
+
+    goToStrategyStage: () =>
+      set((state) => ({
+        ...state,
+        floorStage: 'strategy',
+      })),
+
+    returnToStrategyStage: () =>
+      set((state) => ({
+        ...state,
+        floorStage: 'strategy',
+        selectedOrderTier: null,
+        currentEventResolved: false,
+        currentEventChoiceId: null,
+        lastEventResult: null,
+      })),
+
     getOrderOptions: (strategyId = get().selectedStrategyId) => {
       const state = get()
       if (!strategyId || !STRATEGIES[strategyId]) {
@@ -909,34 +810,87 @@ export const useGameStore = create((set, get) => {
           id: orderTierId,
           label: ORDER_TIERS[orderTierId].label,
           orderQty: plan?.orderQty ?? 0,
-          prepayment:
-            (plan?.orderQty ?? 0) * (plan?.previewUnitCost ?? 0),
+          prepayment: (plan?.orderQty ?? 0) * (plan?.previewUnitCost ?? 0),
+          sellPrice: plan?.sellPrice ?? 0,
         }
       })
     },
 
-    selectStrategy: (strategyId) => {
+    getStrategyPreview: () => {
+      const state = get()
+      if (!state.selectedStrategyId || !state.selectedOrderTier || !hasEffect(state, 'preview')) {
+        return null
+      }
+
+      const previewState = previewStrategyEffect(state, state.selectedStrategyId)
+      const virtualState = {
+        ...state,
+        qualityScore: previewState.qualityScore,
+        brandValue: previewState.brandValue,
+        capital: previewState.capital,
+      }
+      const plan = composeTurnPlan(virtualState, state.selectedStrategyId, state.selectedOrderTier)
+      if (!plan) {
+        return null
+      }
+
+      const playerEntry = buildPlayerEntry(virtualState, plan, previewState)
+      const rivalPlayers = buildRivalPlayers({
+        econPhase: state.econPhase,
+        itemCategory: state.itemCategory,
+        rivals: state.rivals,
+      }).map((rival) => ({
+        ...rival,
+        attraction: hasEffect(state, 'rivalFreeze') ? 0 : rival.attraction,
+      }))
+      const totalDemand = calcDemandEstimate({
+        category: state.itemCategory,
+        econPhase: state.econPhase,
+        industryTier: state.industryTier,
+        momentumMul: 1 + getMomentumEffect(state.momentum).demandMul,
+        blackSwanMul: state.activeBlackSwan?.demandMul ?? 1,
+        eventMul: 1,
+      })
+      const breakdown = calcGroupDemandBreakdown({
+        econPhase: state.econPhase,
+        totalDemand,
+        players: [playerEntry, ...rivalPlayers],
+        ratioMultipliers: buildDemandRatioMultipliers(state.selectedStrategyId),
+      })
+      const predictedSales = Math.min(
+        breakdown.salesByPlayer[0]?.totalSold ?? 0,
+        plan.orderQty,
+      )
+      const predictedRevenue = predictedSales * plan.sellPrice
+      const predictedCost = plan.orderQty * plan.previewUnitCost
+      const fixedTotal =
+        Math.round((state.debt * state.interestRate) / 12) +
+        (state.realty === 'monthly' ? 1000000 : 0) +
+        state.monthlyFixedCost
+      const predictedProfit = predictedRevenue - predictedCost - fixedTotal
+
+      return {
+        predictedSales,
+        predictedProfit,
+      }
+    },
+
+    selectStrategy: (strategyId) =>
       set((state) => ({
         ...state,
         selectedStrategyId: strategyId,
         selectedOrderTier: null,
-      }))
-      const current = get()
-      if (current.currentEventResolved && current.selectedOrderTier) {
-        get().advanceFloor()
-      }
-    },
+        currentEventResolved: false,
+        currentEventChoiceId: null,
+        lastEventResult: null,
+        floorStage: 'strategy',
+      })),
 
-    selectOrderTier: (orderTierId) => {
+    selectOrderTier: (orderTierId) =>
       set((state) => ({
         ...state,
         selectedOrderTier: orderTierId,
-      }))
-      const current = get()
-      if (current.currentEventResolved && current.selectedStrategyId) {
-        get().advanceFloor()
-      }
-    },
+      })),
 
     resolveEventChoice: (choiceId) => {
       const state = get()
@@ -951,7 +905,7 @@ export const useGameStore = create((set, get) => {
       const effects = success ? choice.successEffects : choice.failureEffects
 
       set((current) => ({
-        ...applyEventEffects(current, effects),
+        ...current,
         currentEventResolved: true,
         currentEventChoiceId: choiceId,
         lastEventResult: {
@@ -961,20 +915,16 @@ export const useGameStore = create((set, get) => {
           message,
           effects,
         },
+        floorStage: 'confirm',
       }))
 
       enqueueToast(message, success ? 'positive' : 'negative')
-      if (get().selectedStrategyId && get().selectedOrderTier) {
-        get().advanceFloor()
-      }
     },
 
     closeSettlementModal: () =>
       set((state) => ({
         ...state,
-        settlementModalOpen: false,
-        shopScreenOpen: state.gameStatus === 'playing',
-        shopOpen: true,
+        floorStage: 'shop',
       })),
 
     selectReward: (rewardId) =>
@@ -1011,56 +961,25 @@ export const useGameStore = create((set, get) => {
 
     continueFromShop: () => {
       const state = get()
-      if (!state.shopScreenOpen) {
+      if (state.floorStage !== 'shop' || !state.rewardClaimed) {
         return
       }
 
-      const nextState = {
+      const nextState = prepareNextFloorState({
         ...state,
-        shopScreenOpen: false,
-        shopOpen: false,
-        rewardPending: null,
-        rewardSelection: null,
-        rewardClaimed: false,
-        currentEventResolved: false,
-        currentEventChoiceId: null,
-        lastEventResult: null,
-        selectedStrategyId: null,
-        selectedOrderTier: null,
-        currentEventCardId: null,
-        warningAlerts: [],
-        shopPurchasesThisFloor: [],
-      }
+        consumerGroupRatios: getConsumerGroupRatios(state.econPhase),
+      })
 
-      const currentEventCardId = drawCurrentEvent(nextState)
-      const withEvent = {
-        ...nextState,
-        currentEventCardId,
-      }
-      const warningAlerts = getWarningAlerts(withEvent)
-      const finalState = {
-        ...withEvent,
-        warningAlerts,
-      }
-
-      set(finalState)
-      saveSaveSlot(buildSaveSnapshot(finalState))
+      set(nextState)
+      saveSaveSlot(buildSaveSnapshot(nextState))
     },
-
-    toggleShop: () =>
-      set((state) => ({
-        ...state,
-        shopOpen: !state.shopOpen,
-      })),
-
-    acknowledgeBlackSwan: () =>
-      set((state) => ({
-        ...state,
-        blackSwanSeen: true,
-      })),
 
     buyShopItem: (shopId) => {
       const state = get()
+      if (state.floorStage !== 'shop') {
+        return
+      }
+
       const item = CREDIT_SHOP.find((entry) => entry.id === shopId)
       if (!item) {
         return
@@ -1081,22 +1000,103 @@ export const useGameStore = create((set, get) => {
       if (item.effect.preview) {
         activeEffects.push({ id: `preview-${Date.now()}`, type: 'preview', value: 1, turnsLeft: 1 })
       }
+      if (item.effect.rerollEvent) {
+        activeEffects.push({ id: `reroll-${Date.now()}`, type: 'rerollEvent', value: 1, turnsLeft: 1 })
+      }
 
-      set((current) => ({
-        ...current,
-        credits: current.credits - price,
-        companyHealth: applyHealth(current.companyHealth, item.effect.companyHealth ?? 0, current.maxHealth),
-        currentEventCardId:
-          item.effect.rerollEvent && !current.currentEventResolved
-            ? drawCurrentEvent(current)
-            : current.currentEventCardId,
+      const nextState = {
+        ...state,
+        credits: state.credits - price,
+        companyHealth: applyHealth(
+          state.companyHealth,
+          item.effect.companyHealth ?? 0,
+          state.maxHealth,
+        ),
         activeEffects,
-        shopPurchasesThisFloor: [...current.shopPurchasesThisFloor, shopId],
-      }))
-      saveSaveSlot(buildSaveSnapshot(get()))
+        shopPurchasesThisFloor: [...state.shopPurchasesThisFloor, shopId],
+      }
+
+      set(nextState)
+      saveSaveSlot(buildSaveSnapshot(nextState))
     },
 
-    advanceFloor: () => {
+    adminJumpToFloor: (targetFloor) => {
+      const state = get()
+      if (!state.auth?.isAdmin || state.gameStatus !== 'playing') {
+        return
+      }
+
+      const nextFloor = clamp(Math.round(Number(targetFloor) || 1), 1, state.maxFloors)
+      let nextRivals = createInitialRivals()
+      for (let floorIndex = 2; floorIndex <= nextFloor; floorIndex += 1) {
+        nextRivals = ensureRivalsJoined(nextRivals, floorIndex)
+      }
+
+      const nextState = prepareNextFloorState({
+        ...state,
+        floor: nextFloor,
+        rivals: nextRivals,
+        currentEventCardId: null,
+        currentEventResolved: false,
+        currentEventChoiceId: null,
+        lastEventResult: null,
+        lastSettlement: null,
+        rewardPending: null,
+        rewardSelection: null,
+        rewardClaimed: false,
+      })
+
+      set(nextState)
+      saveSaveSlot(buildSaveSnapshot(nextState))
+      enqueueToast(`${nextFloor}층으로 이동했습니다.`, 'warning')
+    },
+
+    adminGrantCapital: (amount) => {
+      const state = get()
+      if (!state.auth?.isAdmin || state.gameStatus !== 'playing') {
+        return
+      }
+
+      const nextState = {
+        ...state,
+        capital: Math.max(0, state.capital + Math.round(Number(amount) || 0)),
+      }
+      set(nextState)
+      saveSaveSlot(buildSaveSnapshot(nextState))
+      enqueueToast(`현금 ${Math.round(Number(amount) || 0).toLocaleString()}원을 지급했습니다.`, 'positive')
+    },
+
+    adminGrantCredits: (amount) => {
+      const state = get()
+      if (!state.auth?.isAdmin || state.gameStatus !== 'playing') {
+        return
+      }
+
+      const nextState = {
+        ...state,
+        credits: Math.max(0, state.credits + Math.round(Number(amount) || 0)),
+      }
+      set(nextState)
+      saveSaveSlot(buildSaveSnapshot(nextState))
+      enqueueToast(`크레딧 ${Math.round(Number(amount) || 0)}C를 지급했습니다.`, 'positive')
+    },
+
+    adminHealCompany: () => {
+      const state = get()
+      if (!state.auth?.isAdmin || state.gameStatus !== 'playing') {
+        return
+      }
+
+      const nextState = {
+        ...state,
+        companyHealth: state.maxHealth,
+      }
+      set(nextState)
+      saveSaveSlot(buildSaveSnapshot(nextState))
+      enqueueToast('회사 체력을 최대로 회복했습니다.', 'positive')
+    },
+
+    confirmTurn: () => {
       const state = get()
       if (
         state.gameStatus !== 'playing' ||
@@ -1107,129 +1107,162 @@ export const useGameStore = create((set, get) => {
         return
       }
 
-      const plan = composeTurnPlan(state, state.selectedStrategyId, state.selectedOrderTier)
+      const strategyState = applyStrategyEffect(state, state.selectedStrategyId)
+      const stateWithStrategy = {
+        ...state,
+        qualityScore: Math.max(0, strategyState.qualityScore),
+        brandValue: Math.max(0, strategyState.brandValue),
+        capital: Math.max(0, strategyState.capital),
+      }
+      const stateWithEvent = applyEventEffects(
+        stateWithStrategy,
+        state.lastEventResult?.effects ?? {},
+      )
+      const plan = composeTurnPlan(stateWithEvent, state.selectedStrategyId, state.selectedOrderTier)
       if (!plan) {
         return
       }
 
-      const momentumEffect = getMomentumEffect(state.momentum)
-      const demand = calcDemand({
+      const playerEntry = buildPlayerEntry(stateWithEvent, plan, strategyState)
+      const rivalPlayers = buildRivalPlayers({
+        econPhase: state.econPhase,
+        itemCategory: state.itemCategory,
+        rivals: state.rivals,
+      }).map((rival) => ({
+        ...rival,
+        attraction: hasEffect(stateWithEvent, 'rivalFreeze') ? 0 : rival.attraction,
+      }))
+
+      const totalDemand = calcDemand({
         category: state.itemCategory,
         econPhase: state.econPhase,
         industryTier: state.industryTier,
-        momentumMul: 1 + momentumEffect.demandMul,
-        blackSwanMul: state.activeBlackSwan?.demandMul ?? 1,
-        eventMul: 1 + getEffectValue(state, 'demandMul'),
+        momentumMul: 1 + getMomentumEffect(state.momentum).demandMul,
+        blackSwanMul: 1,
+        eventMul: 1 + getEffectValue(stateWithEvent, 'demandMul'),
       })
 
-      const playerAttraction = calcAttraction({
-        quality: plan.quality,
-        brand: state.brandValue,
-        sellPrice: plan.sellPrice,
-        resistance: state.priceResistance,
-        category: state.itemCategory,
+      const groupBreakdown = calcGroupDemandBreakdown({
         econPhase: state.econPhase,
-        awarenessBonus: plan.awareness,
+        totalDemand,
+        players: [playerEntry, ...rivalPlayers],
+        ratioMultipliers: buildDemandRatioMultipliers(state.selectedStrategyId),
       })
-
-      const shareData = calcRivalShares({
-        playerAttraction,
-        itemCategory: state.itemCategory,
-        econPhase: state.econPhase,
-        rivals: state.rivals,
-      })
-
-      let result = calcSettlement({
+      const playerDemand = groupBreakdown.salesByPlayer[0] ?? {
+        totalSold: 0,
+      }
+      const actualSold = Math.min(playerDemand.totalSold, plan.orderQty)
+      const result = calcSettlement({
         sellPrice: plan.sellPrice,
         orderQty: plan.orderQty,
-        demand,
-        myShare: shareData.myShare,
+        demand: totalDemand,
+        actualSold,
         vendorUnitCost: plan.vendorUnitCost,
         qualityMode: plan.qualityMode,
-        factoryActive: state.factory.built,
-        monthlyInterest: Math.round((state.debt * (state.interestRate + (state.activeBlackSwan?.rateAdd ?? 0))) / 12),
+        factoryActive: state.factory.built && state.factory.buildTurnsLeft <= 0,
+        monthlyInterest: Math.round(state.debt * state.interestRate / 12),
         monthlyRent: state.realty === 'monthly' ? 1000000 : 0,
         safetyCost: state.factory.built && state.factory.safetyOn ? 5000000 : 0,
         otherFixed: state.monthlyFixedCost,
+        rivals: getActiveRivals(state.rivals),
       })
 
       let salvageValue = 0
-      if (hasEffect(state, 'noWaste')) {
+      if (hasEffect(stateWithEvent, 'noWaste')) {
         salvageValue = result.wasteCost
-        result = {
-          ...result,
-          netProfit: result.netProfit + salvageValue,
-        }
       }
 
-      const advisorFee = getAdvisorFee(state.advisor, result.netProfit)
-      const netProfit = result.netProfit - advisorFee
+      const advisorFee = getAdvisorFee(state.advisor, result.netProfit + salvageValue)
+      const netProfit = result.netProfit + salvageValue - advisorFee
       const momentumState = updateMomentum(state.momentumHistory, netProfit)
-      let companyHealth = applyHealth(
-        state.companyHealth,
-        calcHealthDelta({
-          netProfit,
-          waste: result.waste,
-          orderQty: plan.orderQty,
-          blackSwanPenalty: state.activeBlackSwan ? 2 : 0,
-          eventPenalty: state.lastEventResult?.effects?.healthDelta && state.lastEventResult.effects.healthDelta < 0 ? 1 : 0,
-          profitableStreak: momentumState.profitableStreak,
-        }),
+
+      let healthDelta = calcHealthDelta({
+        netProfit,
+        waste: result.waste,
+        orderQty: plan.orderQty,
+        eventPenalty:
+          state.lastEventResult?.effects?.healthDelta && state.lastEventResult.effects.healthDelta < 0
+            ? 1
+            : 0,
+      })
+      if (STRATEGIES[state.selectedStrategyId]?.effect?.stabilityBonus && healthDelta < 0) {
+        healthDelta += 1
+      }
+
+      const companyHealth = applyHealth(
+        stateWithEvent.companyHealth,
+        healthDelta,
         state.maxHealth,
+      )
+
+      const salesByRivalId = Object.fromEntries(
+        rivalPlayers.map((rival, index) => [
+          rival.id,
+          groupBreakdown.salesByPlayer[index + 1]?.totalSold ?? 0,
+        ]),
       )
 
       let nextRivals = updateRivalsFromSettlement({
         rivals: state.rivals,
-        demand,
-        rivalShares: shareData.rivalShares,
+        totalDemand,
+        salesByRivalId,
         playerPrice: plan.sellPrice,
       })
-      nextRivals = applyShareDamage(nextRivals, shareData.myShare)
 
-      let activeEconomicWar = state.activeEconomicWar
-      if (!state.activeBlackSwan && activeEconomicWar) {
-        const warOutcome = applyRivalHealthDamage({
-          rivals: nextRivals,
-          myShare: shareData.myShare,
-          myProfit: netProfit,
-          companyHealth,
-          activeWar: activeEconomicWar,
-        })
-        nextRivals = warOutcome.rivals
-        companyHealth = warOutcome.companyHealth
-        if (activeEconomicWar.floorsLeft !== 999) {
-          activeEconomicWar = {
-            ...activeEconomicWar,
-            floorsLeft: Math.max(0, activeEconomicWar.floorsLeft - 1),
-          }
-        }
-        if (activeEconomicWar.floorsLeft === 0) {
-          activeEconomicWar = null
-        }
-      }
+      const myShare = totalDemand > 0 ? actualSold / totalDemand : 0
+      nextRivals = applyShareDamage(nextRivals, myShare)
+      nextRivals = rotateBankruptRivals(nextRivals)
 
       const nextCapital =
-        state.capital - result.prepayment + result.revenue - result.fixedTotal - advisorFee + salvageValue
+        stateWithEvent.capital -
+        result.prepayment +
+        result.revenue -
+        result.fixedTotal -
+        advisorFee +
+        salvageValue
       const nextFloor = state.floor + 1
-      const nextEconPhase =
-        state.activeBlackSwan?.econLocked ?? advanceEconPhase(state.econPhase, state.meta.boomBonus ?? 0)
+      const nextEconPhase = advanceEconPhase(state.econPhase, state.meta.boomBonus ?? 0)
+      const rivalsAfterJoin = ensureRivalsJoined(nextRivals, nextFloor)
+      const biggestRival = getBiggestRival(rivalsAfterJoin)
+      const rewardPending = createRewardDraft({
+        floor: state.floor,
+        momentum: momentumState.momentum,
+      })
+
+      let gameStatus = 'playing'
+      if (companyHealth <= 0 || nextCapital - state.debt < -30000000) {
+        gameStatus = 'bankrupt'
+      } else if (state.floor >= state.maxFloors) {
+        gameStatus = 'clear'
+      }
+
       const settlement = {
         ...result,
         netProfit,
         advisorFee,
         salvageValue,
         floor: state.floor,
-        demand,
-        myShare: shareData.myShare,
+        demand: totalDemand,
+        myShare,
         orderQty: plan.orderQty,
         sellPrice: plan.sellPrice,
-        plan,
         econFrom: state.econPhase,
         econTo: nextEconPhase,
         healthBefore: state.companyHealth,
         healthAfter: companyHealth,
         momentum: momentumState.momentum,
         momentumHistory: momentumState.momentumHistory,
+        groupDemand: groupBreakdown.groupDemand,
+        groupShares: {
+          quality: groupBreakdown.groupShares.quality[0] ?? 0,
+          brand: groupBreakdown.groupShares.brand[0] ?? 0,
+          value: groupBreakdown.groupShares.value[0] ?? 0,
+          general: groupBreakdown.groupShares.general[0] ?? 0,
+        },
+        consumerGroupRatios: groupBreakdown.ratios,
+        leftoverDemand: result.leftoverDemand,
+        biggestRival,
+        strategyLog: strategyState.log,
         educationHint: getEducationHint({
           strategyId: state.selectedStrategyId,
           econPhase: state.econPhase,
@@ -1240,84 +1273,29 @@ export const useGameStore = create((set, get) => {
         }),
       }
 
-      let activeBlackSwan = state.activeBlackSwan
-      let blackSwanSeen = state.blackSwanSeen
-      if (activeBlackSwan) {
-        activeBlackSwan = {
-          ...activeBlackSwan,
-          floorsLeft: activeBlackSwan.floorsLeft - 1,
-        }
-        if (activeBlackSwan.floorsLeft <= 0) {
-          activeBlackSwan = null
-          blackSwanSeen = false
-        }
-      } else {
-        activeBlackSwan = maybeTriggerBlackSwan({ ...state, floor: nextFloor })
-        if (activeBlackSwan) {
-          blackSwanSeen = false
-        }
-      }
-
-      const rivalsAfterJoin = ensureRivalsJoined(nextRivals, nextFloor, state.industryTier)
-      const joinedRivalIds = RIVAL_ORDER.filter(
-        (rivalId) => !nextRivals?.[rivalId]?.active && rivalsAfterJoin?.[rivalId]?.active,
-      )
-
       const draftState = {
         ...state,
         screen: 'game',
         floor: nextFloor,
+        gameStatus,
+        floorStage: gameStatus === 'playing' ? 'settlement' : 'market',
         econPhase: nextEconPhase,
         capital: nextCapital,
         companyHealth,
         momentum: momentumState.momentum,
         momentumHistory: momentumState.momentumHistory,
-        rivals: rivalsAfterJoin,
-        activeEconomicWar: activeEconomicWar ?? maybeStartEconomicWar({ ...state, floor: nextFloor, rivals: nextRivals }),
-        activeBlackSwan,
-        blackSwanSeen,
-        activeEffects: nextEffectList(state.activeEffects),
-        warningAlerts: [],
-      }
-
-      const rewardPending = createRewardDraft({
-        floor: state.floor,
-        momentum: momentumState.momentum,
-      })
-
-      let gameStatus = 'playing'
-      if (companyHealth <= 0 || nextCapital - state.debt < -30000000) {
-        gameStatus = activeBlackSwan?.id === 'acquisition' ? 'hostile' : 'bankrupt'
-      } else if (state.floor >= state.maxFloors && (!state.activeEconomicWar || netProfit >= 0)) {
-        gameStatus = 'clear'
-      }
-
-      const legacyCards =
-        gameStatus === 'playing' ? state.legacyCards : resolveLegacyCards(draftState, gameStatus)
-      const meta =
-        gameStatus === 'playing'
-          ? state.meta
-          : recordGameEnd(gameStatus, {
-              ...state.meta,
-              advisorUsed: Array.from(new Set([...(state.meta.advisorUsed ?? []), state.advisor])),
-              analystPlays:
-                state.meta.analystPlays + (state.advisor === 'analyst' ? 1 : 0),
-              floor50Reached:
-                state.floor >= 50 ? state.meta.floor50Reached + 1 : state.meta.floor50Reached,
-              floor80Reached:
-                state.floor >= 80 ? state.meta.floor80Reached + 1 : state.meta.floor80Reached,
-              economicWarWins:
-                state.warWinCount + (activeEconomicWar === null && state.activeEconomicWar ? 1 : 0),
-            })
-
-      set({
-        ...draftState,
-        gameStatus,
-        legacyCards,
-        meta,
-        advisorFeeTotal: state.advisorFeeTotal + advisorFee,
-        settlementModalOpen: gameStatus === 'playing',
-        shopScreenOpen: false,
+        qualityScore: Math.max(0, stateWithEvent.qualityScore),
+        brandValue: Math.max(0, stateWithEvent.brandValue),
+        marketing: stateWithEvent.marketing,
+        activeEffects: nextEffectList(
+          consumeSingleEffect(
+            consumeSingleEffect(
+              consumeSingleEffect(stateWithEvent.activeEffects, 'noWaste'),
+              'preview',
+            ),
+            'rivalFreeze',
+          ),
+        ),
         lastSettlement: settlement,
         rewardPending: gameStatus === 'playing' ? rewardPending : null,
         rewardSelection: null,
@@ -1329,16 +1307,15 @@ export const useGameStore = create((set, get) => {
         selectedStrategyId: null,
         selectedOrderTier: null,
         shopPurchasesThisFloor: [],
-        previewOpen: false,
-        floorPhase:
-          draftState.activeBlackSwan || activeBlackSwan
-            ? 'black-swan'
-            : draftState.activeEconomicWar
-              ? 'economic-war'
-              : 'normal',
+        warningAlerts: [],
+        rivals: rivalsAfterJoin,
+        consumerGroupRatios: getConsumerGroupRatios(nextEconPhase),
+        lastGroupShares: settlement.groupShares,
+        lastLeftoverDemand: result.leftoverDemand,
         profitHistory: [...state.profitHistory, netProfit].slice(-12),
         cumulativeProfit: state.cumulativeProfit + netProfit,
-        peakMarketShare: Math.max(state.peakMarketShare, shareData.myShare),
+        peakMarketShare: Math.max(state.peakMarketShare, myShare),
+        advisorFeeTotal: state.advisorFeeTotal + advisorFee,
         decisionLog: [
           {
             floor: state.floor,
@@ -1348,28 +1325,46 @@ export const useGameStore = create((set, get) => {
           },
           ...state.decisionLog,
         ].slice(0, 12),
-      })
-
-      const latestState = get()
-      if (gameStatus === 'playing') {
-        saveSaveSlot(buildSaveSnapshot(latestState))
-        joinedRivalIds.forEach((rivalId) => {
-          enqueueToast(RIVAL_JOIN_TOAST[rivalId] ?? '새 경쟁사가 시장에 진입했습니다.', 'warning')
-        })
-      } else {
-        clearSaveSlot()
-        const playHistory = appendRunHistory(buildHistoryEntry(latestState, gameStatus))
-        set({
-          screen: 'gameover',
-          playHistory,
-          saveExists: false,
-        })
       }
 
-      enqueueToast(
-        `${state.floor}층 정산 완료 · ${netProfit >= 0 ? '+' : ''}${Math.round(netProfit).toLocaleString()}원`,
-        netProfit >= 0 ? 'positive' : 'negative',
+      if (gameStatus === 'playing') {
+        set(draftState)
+        saveSaveSlot(buildSaveSnapshot(get()))
+        enqueueToast(
+          `${state.floor}층 정산 완료 · ${netProfit >= 0 ? '+' : ''}${Math.round(netProfit).toLocaleString()}원`,
+          netProfit >= 0 ? 'positive' : 'negative',
+        )
+        return
+      }
+
+      const legacyCards = resolveLegacyCards(draftState, gameStatus)
+      const meta = recordGameEnd(gameStatus, {
+        ...state.meta,
+        advisorUsed: Array.from(new Set([...(state.meta.advisorUsed ?? []), state.advisor])),
+        analystPlays: state.meta.analystPlays + (state.advisor === 'analyst' ? 1 : 0),
+        floor50Reached:
+          state.floor >= 50 ? state.meta.floor50Reached + 1 : state.meta.floor50Reached,
+        floor80Reached:
+          state.floor >= 80 ? state.meta.floor80Reached + 1 : state.meta.floor80Reached,
+      })
+
+      set({
+        ...draftState,
+        screen: 'gameover',
+        gameStatus,
+        legacyCards,
+        meta,
+        saveExists: false,
+      })
+      clearSaveSlot()
+      const playHistory = appendRunHistory(
+        buildHistoryEntry({ ...draftState, legacyCards }, gameStatus),
       )
+      set((current) => ({
+        ...current,
+        playHistory,
+        saveExists: false,
+      }))
     },
   }
 })

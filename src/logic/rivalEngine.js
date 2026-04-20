@@ -1,222 +1,209 @@
-import { RIVAL_ORDER, RIVALS } from '../constants/rivals.js'
-import { clamp, evaluateRivalStatus, roundTo } from '../lib/gameMath.js'
-import { calcAttraction, calcMarketShares } from './marketEngine.js'
+import { clamp, roundTo } from '../lib/gameMath.js'
+import {
+  RIVAL_NAME_POOL,
+  RIVAL_ORDER,
+  RIVAL_TIERS,
+  createRivalState,
+} from '../constants/rivals.js'
+import { calcAttraction } from './marketEngine.js'
 
 const SHARE_DAMAGE_RATIO = 0.06
-const WAR_DAMAGE_RATIO = 0.08
-
-export function ensureRivalsJoined(rivals, floor, industryTier) {
-  const nextRivals = { ...(rivals ?? {}) }
-
-  RIVAL_ORDER.forEach((rivalId) => {
-    const definition = RIVALS[rivalId]
-    const current = nextRivals[rivalId]
-
-    if (!current || current.active || current.bankrupt) {
-      return
-    }
-
-    const byFloor = definition.joinFloor === floor
-    const byTier = definition.joinCondition === 'industryTier >= 3' && industryTier >= 3
-    if (!byFloor && !byTier) {
-      return
-    }
-
-    nextRivals[rivalId] = {
-      ...current,
-      active: true,
-      marketShare: roundTo((definition.startingShare ?? 0.16) * 100, 1),
-      status: '관망중',
-    }
-  })
-
-  return nextRivals
+const BASE_FIXED_COST = {
+  1: 650000,
+  2: 950000,
+  3: 1450000,
+  4: 2100000,
 }
 
-export function calcRivalShares({
-  playerAttraction,
-  itemCategory,
-  econPhase,
-  rivals,
-}) {
-  const players = [{ id: 'player', attraction: playerAttraction }]
-  const activeIds = []
-
-  RIVAL_ORDER.forEach((rivalId) => {
-    const rival = rivals?.[rivalId]
-    const definition = RIVALS[rivalId]
-    if (!rival?.active || rival.bankrupt || rival.eliminated) {
-      return
-    }
-    activeIds.push(rivalId)
-    players.push({
-      id: rivalId,
-      attraction: calcAttraction({
-        quality: definition.qualityPower,
-        brand: definition.brandPower,
-        sellPrice: rival.currentPrice,
-        resistance: clamp(0.08 + definition.aggression * 0.04, 0, 0.35),
-        category: itemCategory,
-        econPhase,
-      }),
-    })
-  })
-
-  const shares = calcMarketShares(players)
-  const rivalShares = Object.fromEntries(RIVAL_ORDER.map((rivalId) => [rivalId, 0]))
-  activeIds.forEach((rivalId, index) => {
-    rivalShares[rivalId] = shares[index + 1] ?? 0
-  })
-
-  return {
-    myShare: shares[0] ?? 0,
-    rivalShares,
+function getPriceTarget(rival, playerPrice = 0) {
+  if (!playerPrice) {
+    return rival.currentPrice
   }
+
+  switch (rival.focus) {
+    case 'brand':
+      return Math.round(playerPrice * 1.08)
+    case 'quality':
+      return Math.round(playerPrice * 1.1)
+    case 'value_brand':
+      return Math.round(playerPrice * 0.94)
+    case 'brand_quality':
+      return Math.round(playerPrice * 1.12)
+    case 'all_rounder':
+      return Math.round(playerPrice * 1.16)
+    default:
+      return Math.round(playerPrice * 0.82)
+  }
+}
+
+function getRivalCostRatio(rival) {
+  switch (rival.focus) {
+    case 'quality':
+      return 0.68
+    case 'brand':
+      return 0.6
+    case 'brand_quality':
+      return 0.72
+    case 'all_rounder':
+      return 0.75
+    default:
+      return 0.54
+  }
+}
+
+export function ensureRivalsJoined(rivals = [], floor) {
+  return rivals.map((rival) => {
+    if (rival.active || rival.bankrupt || floor < rival.joinFloor) {
+      return rival
+    }
+
+    return {
+      ...rival,
+      active: true,
+      marketShare: 0,
+      eliminated: false,
+    }
+  })
+}
+
+export function getActiveRivals(rivals = []) {
+  return rivals.filter((rival) => rival.active && !rival.bankrupt && !rival.eliminated)
+}
+
+export function buildRivalPlayers({ econPhase, itemCategory, rivals = [] }) {
+  return getActiveRivals(rivals).map((rival) => ({
+    id: rival.id,
+    name: rival.name,
+    tier: rival.tier,
+    qualityScore: rival.qualityScore,
+    brandValue: rival.brandValue,
+    sellPrice: rival.currentPrice,
+    attraction: calcAttraction({
+      quality: rival.qualityScore,
+      brand: rival.brandValue,
+      sellPrice: rival.currentPrice,
+      resistance: 0.04 + rival.tier * 0.02,
+      category: itemCategory,
+      econPhase,
+    }),
+  }))
 }
 
 export function updateRivalsFromSettlement({
-  rivals,
-  demand,
-  rivalShares,
-  playerPrice,
+  rivals = [],
+  totalDemand = 0,
+  salesByRivalId = {},
+  playerPrice = 0,
 }) {
-  const nextRivals = { ...(rivals ?? {}) }
-
-  RIVAL_ORDER.forEach((rivalId) => {
-    const rival = nextRivals[rivalId]
-    const definition = RIVALS[rivalId]
-
-    if (!rival || !rival.active || rival.bankrupt || rival.eliminated) {
-      return
+  return rivals.map((rival) => {
+    if (!rival.active || rival.bankrupt || rival.eliminated) {
+      return rival
     }
 
-    const sharePct = rivalShares[rivalId] ?? 0
-    const soldUnits = Math.round(demand * sharePct)
+    const soldUnits = Math.round(salesByRivalId[rival.id] ?? 0)
     const revenue = soldUnits * rival.currentPrice
-    const unitCostRatio = rivalId === 'nexuscore' ? 0.58 : rivalId === 'megaflex' ? 0.72 : 0.64
-    const variableCost = Math.round(soldUnits * rival.currentPrice * unitCostRatio)
-    const fixedCost = Math.round(850000 + definition.initialCapital * 0.01)
-    const capital = Math.max(rival.capital + revenue - variableCost - fixedCost, 0)
-    const bankrupt = capital <= 0
+    const variableCost = Math.round(revenue * getRivalCostRatio(rival))
+    const fixedCost = BASE_FIXED_COST[rival.tier] ?? 1000000
+    const nextCapital = Math.max(0, rival.capital + revenue - variableCost - fixedCost)
+    const ratio = nextCapital / Math.max(rival.initialCapital, 1)
+    const bankrupt = nextCapital <= 0
 
-    nextRivals[rivalId] = {
+    return {
       ...rival,
-      currentPrice: Math.round(
-        clamp(
-          rivalId === 'megaflex'
-            ? playerPrice - 3000
-            : rivalId === 'aura'
-              ? playerPrice + 12000
-              : rivalId === 'memecatch'
-                ? (rival.currentPrice + playerPrice) / 2 + 2500
-                : playerPrice + 16000,
-          30000,
-          190000,
-        ),
-      ),
-      marketShare: roundTo(sharePct * 100, 1),
-      capital,
+      currentPrice: clamp(getPriceTarget(rival, playerPrice), 18000, 220000),
+      sellPrice: clamp(getPriceTarget(rival, playerPrice), 18000, 220000),
+      capital: nextCapital,
+      marketShare: totalDemand > 0 ? roundTo((soldUnits / totalDemand) * 100, 1) : rival.marketShare,
+      health: clamp(ratio, 0, 1),
       bankrupt,
       eliminated: bankrupt,
-      status: bankrupt
-        ? '퇴출'
-        : evaluateRivalStatus({
-            rivalState: { ...rival, capital, marketShare: sharePct * 100 },
-            initialCapital: definition.initialCapital,
-          }),
     }
   })
-
-  return nextRivals
 }
 
-export function applyRivalHealthDamage({
-  rivals,
-  myShare,
-  myProfit,
-  companyHealth,
-  activeWar,
-}) {
-  let nextHealth = companyHealth
-  const nextRivals = { ...(rivals ?? {}) }
-
-  const relevantIds = activeWar?.rivalIds?.length
-    ? activeWar.rivalIds
-    : RIVAL_ORDER.filter((rivalId) => nextRivals[rivalId]?.active && !nextRivals[rivalId]?.bankrupt)
-
-  relevantIds.forEach((rivalId) => {
-    const rival = nextRivals[rivalId]
-    if (!rival?.active || rival.bankrupt) {
-      return
+export function applyShareDamage(rivals = [], myShare = 0) {
+  return rivals.map((rival) => {
+    if (!rival.active || rival.bankrupt || rival.eliminated) {
+      return rival
     }
 
     const rivalShare = (rival.marketShare ?? 0) / 100
-    let rivalDamage = 0
-    let myDamage = 0
-
-    if (myShare > rivalShare) {
-      rivalDamage += 1
-    } else {
-      myDamage += 1
+    if (myShare <= rivalShare) {
+      return rival
     }
 
-    const rivalProfitPositive = rival.capital / Math.max(rival.initialCapital, 1) > 0.5
-    if (myProfit >= 0 && !rivalProfitPositive) {
-      rivalDamage += 2
-    } else if (myProfit < 0 && !rivalProfitPositive) {
-      rivalDamage += 1
-      myDamage += 1
-    } else if (myProfit < 0 && rivalProfitPositive) {
-      myDamage += 2
-    }
+    const nextCapital = Math.max(
+      0,
+      rival.capital - Math.round(rival.initialCapital * SHARE_DAMAGE_RATIO),
+    )
 
-    nextHealth -= myDamage
-    nextRivals[rivalId] = {
+    return {
       ...rival,
-      capital: Math.max(
-        0,
-        rival.capital - Math.round(rival.initialCapital * WAR_DAMAGE_RATIO * rivalDamage),
-      ),
-    }
-
-    const ratio = nextRivals[rivalId].capital / Math.max(nextRivals[rivalId].initialCapital, 1)
-    if (ratio <= 0.2) {
-      nextRivals[rivalId] = {
-        ...nextRivals[rivalId],
-        bankrupt: true,
-        eliminated: true,
-        active: false,
-        marketShare: 0,
-        status: '퇴출',
-      }
+      capital: nextCapital,
+      health: clamp(nextCapital / Math.max(rival.initialCapital, 1), 0, 1),
+      bankrupt: nextCapital <= 0,
+      eliminated: nextCapital <= 0,
     }
   })
+}
 
-  return {
-    rivals: nextRivals,
-    companyHealth: Math.max(0, nextHealth),
+export function rotateBankruptRivals(rivals = []) {
+  return rivals.map((rival) => {
+    if (!rival.bankrupt) {
+      return rival
+    }
+
+    const pool = RIVAL_NAME_POOL[rival.tier] ?? []
+    const nextNameIndex = pool.length > 0 ? (rival.nameIndex + 1) % pool.length : 0
+
+    return createRivalState({
+      id: rival.id,
+      tier: rival.tier,
+      joinFloor: rival.joinFloor,
+      active: false,
+      nameIndex: nextNameIndex,
+    })
+  })
+}
+
+export function getBiggestRival(rivals = []) {
+  return getActiveRivals(rivals)
+    .slice()
+    .sort((left, right) => (right.marketShare ?? 0) - (left.marketShare ?? 0))[0] ?? null
+}
+
+export function getRivalStatusLabel(rival) {
+  if (!rival || rival.bankrupt || rival.eliminated) {
+    return '퇴출'
   }
+
+  const ratio = rival.capital / Math.max(rival.initialCapital, 1)
+  if (ratio >= 0.7 && rival.tier >= 3) return '공세중'
+  if (ratio >= 0.45) return '관망중'
+  if (ratio >= 0.2) return '위기'
+  return '파산'
 }
 
-export function applyShareDamage(rivals, myShare) {
-  const nextRivals = { ...(rivals ?? {}) }
-
-  RIVAL_ORDER.forEach((rivalId) => {
-    const rival = nextRivals[rivalId]
-    if (!rival?.active || rival.bankrupt) {
-      return
-    }
-
-    if (myShare > (rival.marketShare ?? 0) / 100) {
-      nextRivals[rivalId] = {
-        ...rival,
-        capital: Math.max(
-          0,
-          rival.capital - Math.round(rival.initialCapital * SHARE_DAMAGE_RATIO),
-        ),
-      }
-    }
-  })
-
-  return nextRivals
+export function getRivalStatusKey(rival) {
+  const label = getRivalStatusLabel(rival)
+  if (label === '공세중') return 'attack'
+  if (label === '관망중') return 'watch'
+  if (label === '위기') return 'crisis'
+  if (label === '파산') return 'bankrupt'
+  return 'out'
 }
+
+export function getRivalDisplayRows(rivals = []) {
+  return getActiveRivals(rivals)
+    .map((rival) => ({
+      ...rival,
+      tierLabel: RIVAL_TIERS[rival.tier]?.name ?? `${rival.tier}단계`,
+    }))
+    .sort((left, right) => left.joinFloor - right.joinFloor || left.tier - right.tier)
+}
+
+export function getRivalById(rivals = [], rivalId) {
+  return rivals.find((rival) => rival.id === rivalId) ?? null
+}
+
+export { RIVAL_ORDER }

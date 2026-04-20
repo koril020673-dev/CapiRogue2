@@ -21,11 +21,10 @@ export function EventCard() {
   const currentEventCardId = useGameStore((state) => state.currentEventCardId)
   const currentEventResolved = useGameStore((state) => state.currentEventResolved)
   const selectedStrategyId = useGameStore((state) => state.selectedStrategyId)
-  const selectedOrderTier = useGameStore((state) => state.selectedOrderTier)
   const resolveEventChoice = useGameStore((state) => state.resolveEventChoice)
 
   const card = getEventCardById(currentEventCardId)
-  if (!card || !selectedStrategyId || !selectedOrderTier) {
+  if (!card || !selectedStrategyId) {
     return null
   }
 
@@ -33,10 +32,10 @@ export function EventCard() {
     <section className="cr2-event-card">
       <div className="cr2-event-card__head">
         <div>
-          <p className="cr2-event-card__eyebrow">3. 결재 카드</p>
+          <p className="cr2-event-card__eyebrow">Choice 3</p>
           <h2>{card.name}</h2>
         </div>
-        <span className="cr2-event-card__badge">EVENT</span>
+        <span className="cr2-event-card__badge">DOC CARD</span>
       </div>
 
       <p className="cr2-event-card__desc">{card.description}</p>

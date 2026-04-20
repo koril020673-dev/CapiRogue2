@@ -4,16 +4,20 @@ import { useGameStore } from '../store/useGameStore.js'
 const ORDER_COPY = {
   conservative: {
     label: '보수적',
-    desc: '재고 리스크를 낮춥니다.',
+    desc: '재고 위험을 낮추는 안전한 발주입니다.',
   },
   standard: {
     label: '기본',
-    desc: '평균적인 발주 강도입니다.',
+    desc: '예상 수요의 중심값에 맞춘 표준 발주입니다.',
   },
   aggressive: {
     label: '공격적',
-    desc: '점유율을 위해 크게 베팅합니다.',
+    desc: '남는 수요까지 노리는 확장형 발주입니다.',
   },
+}
+
+function formatMoney(value) {
+  return `${Math.round(value ?? 0).toLocaleString()}원`
 }
 
 export function OrderSelect() {
@@ -34,8 +38,8 @@ export function OrderSelect() {
   return (
     <section className="cr2-order-select">
       <div className="cr2-order-select__head">
-        <p className="cr2-order-select__eyebrow">2. 발주 강도</p>
-        <h2>발주량과 선결제 규모를 정하세요</h2>
+        <p className="cr2-order-select__eyebrow">Choice 2</p>
+        <h2>발주량을 확정하세요</h2>
       </div>
 
       <div className="cr2-order-select__grid">
@@ -53,7 +57,7 @@ export function OrderSelect() {
               <span className="cr2-order-select__tier">{copy.label}</span>
               <strong>{option.orderQty.toLocaleString()}개 발주</strong>
               <p>{copy.desc}</p>
-              <small>선결제 {Math.round(option.prepayment).toLocaleString()}원</small>
+              <small>선결제 {formatMoney(option.prepayment)}</small>
             </button>
           )
         })}

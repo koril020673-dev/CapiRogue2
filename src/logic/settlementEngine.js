@@ -10,7 +10,7 @@ export function calcSettlement({
   sellPrice,
   orderQty,
   demand,
-  myShare,
+  actualSold,
   vendorUnitCost,
   qualityMode,
   factoryActive,
@@ -18,24 +18,25 @@ export function calcSettlement({
   monthlyRent,
   safetyCost,
   otherFixed,
+  rivals = [],
   opCostMultiplier = 1,
-  shutdownLeft = 0,
 }) {
   const qualityMul = QUALITY_MUL[qualityMode] ?? 1
   const discount = factoryActive ? FACTORY_DISCOUNT : 1
   const unitCost = Math.round(vendorUnitCost * qualityMul * discount)
   const prepayment = unitCost * orderQty
-
-  const demandSold = shutdownLeft > 0 ? 0 : Math.round(demand * myShare)
-  const actualSold = Math.min(demandSold, orderQty)
-  const waste = orderQty - actualSold
+  const waste = Math.max(0, orderQty - actualSold)
   const wasteCost = unitCost * waste
-
   const revenue = actualSold * sellPrice
   const fixedTotal = Math.round(
     (monthlyInterest + monthlyRent + safetyCost + otherFixed) * opCostMultiplier,
   )
   const netProfit = revenue - prepayment - fixedTotal
+  const leftoverDemand = Math.max(0, demand - actualSold)
+  const biggestRival = rivals
+    .filter((rival) => !rival.bankrupt)
+    .slice()
+    .sort((left, right) => (right.marketShare ?? 0) - (left.marketShare ?? 0))[0] ?? null
 
   return {
     unitCost,
@@ -46,10 +47,7 @@ export function calcSettlement({
     revenue,
     fixedTotal,
     netProfit,
-    summary: {
-      sold: `${actualSold}개 판매 / 발주 ${orderQty}개 / 수요 ${demand}개`,
-      waste: waste > 0 ? `폐기 ${waste}개 (-${wasteCost.toLocaleString()}원)` : null,
-      profit: netProfit >= 0 ? `+${netProfit.toLocaleString()}원` : `${netProfit.toLocaleString()}원`,
-    },
+    leftoverDemand,
+    biggestRival,
   }
 }

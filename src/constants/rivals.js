@@ -1,213 +1,192 @@
-export const RIVAL_ORDER = ['megaflex', 'aura', 'memecatch', 'nexuscore']
-
-export const RIVALS = {
-  megaflex: {
-    id: 'megaflex',
-    name: '메가플렉스',
-    icon: '🏭',
-    archetype: '덤핑 공세형',
-    color: '#FF8A65',
-    pattern: 'aggressive',
-    joinFloor: 1,
-    initialCapital: 30000000,
-    bossFloor: 20,
-    bossCondition: '5턴 연속 점유율 25% 이상 유지',
-    bossThreshold: { metric: 'marketShare', value: 0.25, consecutiveTurns: 5 },
-    basePrice: 69000,
-    startingShare: 0.23,
-    brandPower: 84,
-    qualityPower: 82,
-    aggression: 1.35,
-    volatility: 0.9,
-    cadenceOffset: 0,
-    undercutCap: 4.4,
-    summary: '가격을 먼저 흔들어 시장을 잠식하는 대형 경쟁사',
-    weakPhase: ['boom', 'growth'],
-    strongPhase: ['contraction', 'recession'],
+export const RIVAL_TIERS = {
+  1: {
+    tier: 1,
+    name: '1단계 (반바지 꼬마급)',
+    strategy: 'value_only',
+    strategyLabel: '가성비',
+    priceAggressiveness: 0.85,
+    brandInvestment: 0,
+    qualityInvestment: 0,
+    description: '가성비 위주. 브랜드와 품질 투자는 거의 없다.',
   },
-  aura: {
-    id: 'aura',
-    name: '아우라',
-    icon: '💎',
-    archetype: '프리미엄 브랜드형',
-    color: '#F6C453',
-    pattern: 'premium',
-    joinFloor: 10,
-    initialCapital: 40000000,
-    bossFloor: 40,
-    bossCondition: '브랜드 가치 150pt 이상 달성',
-    bossThreshold: { metric: 'brandValue', value: 150 },
-    basePrice: 108000,
-    startingShare: 0.18,
-    brandPower: 128,
-    qualityPower: 106,
-    aggression: 0.88,
-    volatility: 0.45,
-    cadenceOffset: 1,
-    undercutCap: 2.1,
-    summary: '가격보다 이미지와 체급으로 압박하는 프리미엄 경쟁사',
-    weakPhase: ['contraction', 'recession'],
-    strongPhase: ['boom', 'growth'],
+  2: {
+    tier: 2,
+    name: '2단계 (수준급 트레이너)',
+    strategy: 'single_focus',
+    strategyLabel: '단일 특화',
+    priceAggressiveness: 1,
+    brandInvestment: 0.5,
+    qualityInvestment: 0.5,
+    description: '브랜드 또는 품질 하나만 집중한다.',
   },
-  memecatch: {
-    id: 'memecatch',
-    name: '밈캐치',
-    icon: '📱',
-    archetype: '바이럴 변동형',
-    color: '#7FE6C5',
-    pattern: 'volatile',
-    joinFloor: 30,
-    initialCapital: 20000000,
-    bossFloor: 60,
-    bossCondition: '3턴 연속 마케팅 3천만 이상 집행',
-    bossThreshold: { metric: 'marketingSpent', value: 30000000, consecutiveTurns: 3 },
-    basePrice: 84000,
-    startingShare: 0.16,
-    brandPower: 96,
-    qualityPower: 88,
-    aggression: 1.08,
-    volatility: 0.8,
-    cadenceOffset: 2,
-    undercutCap: 3.2,
-    summary: '밈과 이슈에 기대 급등락하는 변동형 경쟁사',
-    weakPhase: ['stable', 'contraction'],
-    strongPhase: ['boom'],
+  3: {
+    tier: 3,
+    name: '3단계 (4천왕급)',
+    strategy: 'dual_focus',
+    strategyLabel: '복합 특화',
+    priceAggressiveness: 1,
+    brandInvestment: 0.8,
+    qualityInvestment: 0.8,
+    description: '가성비와 브랜드, 또는 브랜드와 품질 조합을 쓴다.',
   },
-  nexuscore: {
-    id: 'nexuscore',
-    name: '넥서스코어',
-    icon: '🔬',
-    archetype: '기술 독점형',
-    color: '#8AB4FF',
-    pattern: 'techmonopoly',
-    joinFloor: null,
-    joinCondition: 'industryTier >= 3',
-    initialCapital: 80000000,
-    bossFloor: 80,
-    bossCondition: 'Tier 3 + 품질 점수 200 이상',
-    bossThreshold: { metric: 'qualityScore', value: 200, requireTier: 3 },
-    basePrice: 132000,
-    startingShare: 0.21,
-    brandPower: 112,
-    qualityPower: 132,
-    aggression: 0.76,
-    volatility: 0.35,
-    cadenceOffset: 3,
-    undercutCap: 1.8,
-    summary: '기술과 특허로 고급 수요를 잠그는 독점형 경쟁사',
-    weakPhase: [],
-    strongPhase: ['boom', 'growth', 'stable'],
+  4: {
+    tier: 4,
+    name: '4단계 (챔피언급)',
+    strategy: 'all_rounder',
+    strategyLabel: '올라운더',
+    priceAggressiveness: 1,
+    brandInvestment: 1,
+    qualityInvestment: 1,
+    description: '모든 전략을 동시에 구사한다.',
   },
 }
 
-export const RIVAL_NAMES = {
-  megaflex: ['메가플렉스', '하이퍼마트', '코어플렉스', '넥스트플렉스', '울트라마트'],
-  aura: ['아우라', '루미나', '에클라', '오라클럭스', '셀레스티아'],
-  memecatch: ['밈캐치', '버즈웨이브', '바이럴픽', '트렌디코', '픽셀버스트'],
-  nexuscore: ['넥서스코어', '퀀텀베이스', '시냅스텍', '코어매트릭스', '제네시스랩'],
+export const RIVAL_SPAWN_RULES = {
+  1: { tier: 1, count: 1 },
+  10: { tier: 2, count: 1 },
+  30: { tier: 3, count: 1 },
+  60: { tier: 4, count: 1 },
 }
 
-export const MID_BOSS_EVENTS = {
-  10: {
-    rivalId: 'megaflex',
-    type: 'mid-boss',
-    action: '메가플렉스가 이번 달 판매가를 원가 수준까지 내렸습니다.',
-    threat: '이번 층 당신의 점유율 -10%',
-    effect: { shareDebuff: -0.1 },
-  },
-  20: {
-    rivalId: 'megaflex',
-    type: 'boss',
-    action: '메가플렉스가 대규모 덤핑 캠페인을 시작했습니다.',
-    threat: '10턴간 수요 -20%, 5턴 연속 점유율 25% 이상 유지',
-    bossCondition: { metric: 'marketShare', value: 0.25, consecutiveTurns: 5 },
-    effect: { demandMul: -0.2 },
-  },
-  30: {
-    rivalId: 'aura',
-    type: 'mid-boss',
-    action: '아우라가 프리미엄 신제품을 출시했습니다.',
-    threat: '브랜드 가치가 낮으면 이번 층 점유율 -8%',
-    effect: { brandThreshold: 50, shareDebuff: -0.08 },
-  },
-  40: {
-    rivalId: 'aura',
-    type: 'boss',
-    action: '아우라가 브랜드 독점을 선언했습니다.',
-    threat: '브랜드 가치 150pt 이상 달성',
-    bossCondition: { metric: 'brandValue', value: 150 },
-  },
-  50: {
-    rivalId: 'memecatch',
-    type: 'mid-boss',
-    action: '밈캐치가 바이럴 캠페인을 터뜨렸습니다.',
-    threat: '이번 층 수요 변동성 +50%',
-    effect: { demandVariance: 0.5 },
-  },
-  60: {
-    rivalId: 'memecatch',
-    type: 'boss',
-    action: '밈캐치가 전면적 SNS 공세를 시작했습니다.',
-    threat: '3턴 연속 마케팅 3천만 이상 집행',
-    bossCondition: { metric: 'marketingSpent', value: 30000000, consecutiveTurns: 3 },
-  },
-  70: {
-    rivalId: 'megaflex',
-    type: 'mid-boss',
-    action: '메가플렉스가 물류망을 장악했습니다.',
-    threat: '이번 층 원가 +10%',
-    effect: { costDebuff: 0.1 },
-  },
-  80: {
-    rivalId: 'nexuscore',
-    type: 'boss',
-    action: '넥서스코어가 기술 독점을 완성했습니다.',
-    threat: 'Tier 3 + 품질 점수 200 이상 달성',
-    bossCondition: { metric: 'qualityScore', value: 200, requireTier: 3 },
-    note: 'Tier 3에 도달하지 못했다면 이번 보스는 스킵됩니다.',
-  },
-  90: {
-    rivalId: 'aura',
-    type: 'mid-boss',
-    action: '아우라가 마지막 프리미엄 공세를 시작했습니다.',
-    threat: '이번 층 프리미엄 전략 효과 -30%',
-    effect: { premiumDebuff: 0.3 },
-  },
-  100: {
-    rivalId: 'megaflex',
-    type: 'boss',
-    action: '메가플렉스 최후의 공세. 시장 장악을 선언했습니다.',
-    threat: '10턴간 점유율 -15% 페널티, 순자산 3억 유지',
-    bossCondition: { metric: 'netWorth', value: 300000000 },
-    effect: { shareDebuff: -0.15 },
-  },
+export const RIVAL_NAME_POOL = {
+  1: ['반바지마트', '꼬마상회', '오성스토어', '미니플렉스', '소소마켓'],
+  2: ['트레이더스', '미드마트', '실력파상사', '중견브랜드', '스탠다드코'],
+  3: ['천왕기업', '엘리트코퍼', '파워브랜드', '퀄리티킹', '마스터플렉스'],
+  4: ['챔피언코퍼', '울티마그룹', '서버린마켓', '토탈브랜드', '에이스코퍼'],
+}
+
+export const RIVAL_ORDER = ['rival-1', 'rival-2', 'rival-3', 'rival-4']
+
+const RIVAL_BASE_STATS = {
+  1: { capital: 20000000, qualityScore: 28, brandValue: 10, sellPrice: 42000 },
+  2: { capital: 36000000, qualityScore: 52, brandValue: 52, sellPrice: 62000 },
+  3: { capital: 58000000, qualityScore: 76, brandValue: 70, sellPrice: 76000 },
+  4: { capital: 92000000, qualityScore: 92, brandValue: 92, sellPrice: 92000 },
+}
+
+function pickTierFocus(tier) {
+  if (tier === 2) {
+    return Math.random() < 0.5 ? 'brand' : 'quality'
+  }
+
+  if (tier === 3) {
+    return Math.random() < 0.5 ? 'value_brand' : 'brand_quality'
+  }
+
+  if (tier === 4) {
+    return 'all_rounder'
+  }
+
+  return 'value_only'
+}
+
+function getRivalName(tier, nameIndex = 0) {
+  const names = RIVAL_NAME_POOL[tier] ?? []
+  if (!names.length) {
+    return `라이벌 ${tier}`
+  }
+
+  return names[nameIndex % names.length]
+}
+
+function getTierPrice(tier, focus) {
+  const base = RIVAL_BASE_STATS[tier]?.sellPrice ?? 52000
+  if (focus === 'brand') return Math.round(base * 1.08)
+  if (focus === 'quality') return Math.round(base * 1.1)
+  if (focus === 'value_brand') return Math.round(base * 0.96)
+  if (focus === 'brand_quality') return Math.round(base * 1.12)
+  if (focus === 'all_rounder') return Math.round(base * 1.16)
+  return base
+}
+
+function getTierBrandValue(tier, focus) {
+  const base = RIVAL_BASE_STATS[tier]?.brandValue ?? 20
+  if (focus === 'brand') return base + 20
+  if (focus === 'quality') return base - 12
+  if (focus === 'value_brand') return base + 12
+  if (focus === 'brand_quality') return base + 18
+  if (focus === 'all_rounder') return base + 24
+  return base
+}
+
+function getTierQualityScore(tier, focus) {
+  const base = RIVAL_BASE_STATS[tier]?.qualityScore ?? 20
+  if (focus === 'brand') return base - 10
+  if (focus === 'quality') return base + 22
+  if (focus === 'value_brand') return base + 4
+  if (focus === 'brand_quality') return base + 18
+  if (focus === 'all_rounder') return base + 20
+  return base
+}
+
+export function createRivalState({ id, tier, joinFloor, active = false, nameIndex = 0 }) {
+  const focus = pickTierFocus(tier)
+  const base = RIVAL_BASE_STATS[tier]
+
+  return {
+    id,
+    tier,
+    joinFloor,
+    name: getRivalName(tier, nameIndex),
+    nameIndex,
+    focus,
+    strategy: focus,
+    strategyLabel:
+      focus === 'brand'
+        ? '브랜드'
+        : focus === 'quality'
+          ? '품질'
+          : focus === 'value_brand'
+            ? '가성비+브랜드'
+            : focus === 'brand_quality'
+              ? '브랜드+품질'
+              : focus === 'all_rounder'
+                ? '복합'
+                : '가성비',
+    initialCapital: base.capital,
+    capital: base.capital,
+    health: 1,
+    marketShare: active ? 18 : 0,
+    currentPrice: getTierPrice(tier, focus),
+    sellPrice: getTierPrice(tier, focus),
+    brandValue: getTierBrandValue(tier, focus),
+    qualityScore: getTierQualityScore(tier, focus),
+    active,
+    bankrupt: false,
+    eliminated: false,
+  }
 }
 
 export function createInitialRivals() {
-  return RIVAL_ORDER.reduce((rivalState, rivalId) => {
-    const rival = RIVALS[rivalId]
-    const active = rival.joinFloor === 1
+  const spawns = Object.entries(RIVAL_SPAWN_RULES)
+    .map(([floor, config]) => ({ floor: Number(floor), ...config }))
+    .sort((left, right) => left.floor - right.floor)
 
-    rivalState[rivalId] = {
-      id: rival.id,
-      name: RIVAL_NAMES[rivalId][0],
-      nameIndex: 0,
-      capital: rival.initialCapital,
-      initialCapital: rival.initialCapital,
-      currentPrice: rival.basePrice,
-      marketShare: active ? rival.startingShare * 100 : 0,
-      status: active ? '관망중' : '대기중',
-      active,
-      eliminated: false,
-      bankrupt: false,
-      bossProgress: 0,
-      isAggressive: rival.pattern === 'aggressive',
-    }
-
-    return rivalState
-  }, {})
+  return spawns.map((spawn, index) =>
+    createRivalState({
+      id: RIVAL_ORDER[index],
+      tier: spawn.tier,
+      joinFloor: spawn.floor,
+      active: spawn.floor === 1,
+    }),
+  )
 }
 
-export function getRivalDefinition(rivalId) {
-  return RIVALS[rivalId] ?? RIVALS.megaflex
+export function getRivalTierDefinition(tier) {
+  return RIVAL_TIERS[tier] ?? RIVAL_TIERS[1]
 }
+
+export const RIVALS = Object.fromEntries(
+  RIVAL_ORDER.map((id, index) => {
+    const tier = index + 1
+    return [
+      id,
+      {
+        id,
+        tier,
+        name: getRivalName(tier, 0),
+        ...RIVAL_TIERS[tier],
+      },
+    ]
+  }),
+)

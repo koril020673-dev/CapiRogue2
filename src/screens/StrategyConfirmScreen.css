@@ -1,0 +1,110 @@
+.cr2-confirm-screen {
+  display: grid;
+  gap: 20px;
+}
+
+.cr2-confirm-screen__head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.cr2-confirm-screen__eyebrow {
+  color: var(--cr2-dim);
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cr2-confirm-screen__head h2,
+.cr2-confirm-screen__preview h3,
+.cr2-confirm-screen__question h3,
+.cr2-confirm-screen__fallback h2 {
+  color: var(--cr2-text);
+}
+
+.cr2-confirm-screen__event-result {
+  max-width: 360px;
+  padding: 10px 14px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--cr2-neutral);
+  line-height: 1.5;
+}
+
+.cr2-confirm-screen__preview,
+.cr2-confirm-screen__question,
+.cr2-confirm-screen__fallback {
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 22px;
+  background: var(--cr2-s2);
+}
+
+.cr2-confirm-screen__preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cr2-confirm-screen__preview-grid div {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cr2-confirm-screen__preview-grid span,
+.cr2-confirm-screen__preview-empty {
+  color: var(--cr2-neutral);
+}
+
+.cr2-confirm-screen__preview-grid strong {
+  color: var(--cr2-text);
+}
+
+.cr2-confirm-screen__preview-grid strong[data-negative='true'] {
+  color: var(--cr2-negative);
+}
+
+.cr2-confirm-screen__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cr2-confirm-screen__action {
+  padding: 14px 18px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cr2-text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cr2-confirm-screen__action--primary {
+  border-color: rgba(240, 165, 0, 0.32);
+  background: rgba(240, 165, 0, 0.12);
+}
+
+.cr2-confirm-screen__action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .cr2-confirm-screen__head {
+    flex-direction: column;
+  }
+
+  .cr2-confirm-screen__preview-grid {
+    grid-template-columns: 1fr;
+  }
+}
