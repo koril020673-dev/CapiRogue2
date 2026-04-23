@@ -1000,7 +1000,9 @@ export const useGameStore = create((set, get) => {
         floorStage: 'strategy',
         selectedOrderTier: null,
         customOrderQty: '',
-        currentEventResolved: state._eventsGeneratedFloor === state.floor,
+        currentEventResolved:
+          state.currentEventResolved ||
+          (state._eventsGeneratedFloor === state.floor && !state.currentPlayerEvent),
       })),
 
     generateFloorEvents: () => {

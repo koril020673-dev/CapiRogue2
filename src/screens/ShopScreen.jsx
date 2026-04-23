@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import './ShopScreen.css'
 import { GRADE_LABEL, CREDIT_SHOP_ITEMS } from '../constants/rewards.js'
 import { getAdvisorBriefing } from '../logic/advisorBriefingEngine.js'
@@ -30,8 +30,6 @@ export function ShopScreen() {
   const buyItem = useGameStore((state) => state.buyItem)
   const continueFromShop = useGameStore((state) => state.continueFromShop)
 
-  const [briefingOpen, setBriefingOpen] = useState(false)
-
   useEffect(() => {
     if (floorStage === 'shop' && currentRewards.length === 0) {
       generateFloorRewards()
@@ -39,7 +37,10 @@ export function ShopScreen() {
   }, [currentRewards.length, floorStage, generateFloorRewards])
 
   const activeRivals = useMemo(
-    () => rivals.filter((rival) => rival.active && !rival.bankrupt && !rival.eliminated),
+    () =>
+      (Array.isArray(rivals) ? rivals : []).filter(
+        (rival) => rival.active && !rival.bankrupt && !rival.eliminated,
+      ),
     [rivals],
   )
 
@@ -100,82 +101,66 @@ export function ShopScreen() {
         ))}
       </div>
 
-      {!briefingOpen ? (
-        <div className="cr2-shop-footer">
-          <button type="button" className="cr2-btn-secondary" onClick={() => setBriefingOpen(true)}>
-            현상황
-          </button>
-          <button
-            type="button"
-            className="cr2-btn-primary"
-            disabled={!rewardSelection}
-            onClick={continueFromShop}
-          >
-            보상 확정 →
-          </button>
+      <div className="cr2-briefing-panel">
+        <div className="cr2-briefing-summary">
+          <span>📊</span>
+          <p>{briefing}</p>
         </div>
-      ) : null}
 
-      {briefingOpen ? (
-        <div className="cr2-briefing-panel">
-          <div className="cr2-briefing-summary">
-            <span>📊</span>
-            <p>{briefing}</p>
-          </div>
-
-          <div className="cr2-briefing-body">
-            <div className="cr2-briefing-rivals">
-              <p className="cr2-briefing-col-title">라이벌 전략</p>
-              {activeRivals.length ? (
-                activeRivals.map((rival) => (
-                  <div key={rival.id} className="cr2-briefing-rival-row">
-                    <span>
-                      {rival.name} ({rival.tier}단계)
-                    </span>
-                    <span>→ {rival.strategyLabel}</span>
-                    <span>{rival.sellPrice?.toLocaleString()}원</span>
-                    <span>{Number(rival.marketShare ?? 0).toFixed(1)}%</span>
-                  </div>
-                ))
-              ) : (
-                <div className="cr2-briefing-empty">현재 표시할 라이벌 정보가 없습니다.</div>
-              )}
-            </div>
-
-            <div className="cr2-briefing-company">
-              <p className="cr2-briefing-col-title">내 회사 상황</p>
-              {[
-                ['현금', fmt(capital)],
-                ['부채', fmt(debt)],
-                ['브랜드', `${Math.round(brandValue)}pt`],
-                ['품질', `${Math.round(qualityScore)}pt`],
-                ['점유율', `${((lastSettlement?.myShare ?? 0) * 100).toFixed(1)}%`],
-              ].map(([label, value]) => (
-                <div key={label} className="cr2-briefing-stat-row">
-                  <span>{label}</span>
-                  <span>{value}</span>
+        <div className="cr2-briefing-body">
+          <div className="cr2-briefing-rivals">
+            <p className="cr2-briefing-col-title">라이벌 전략</p>
+            {activeRivals.length ? (
+              activeRivals.map((rival) => (
+                <div key={rival.id} className="cr2-briefing-rival-row">
+                  <span>
+                    {rival.name} ({rival.tier}단계)
+                  </span>
+                  <span>→ {rival.strategyLabel}</span>
+                  <span>{rival.sellPrice?.toLocaleString()}원</span>
+                  <span>{Number(rival.marketShare ?? 0).toFixed(1)}%</span>
                 </div>
-              ))}
+              ))
+            ) : (
+              <div className="cr2-briefing-empty">현재 표시할 라이벌 정보가 없습니다.</div>
+            )}
+          </div>
 
-              <div className="cr2-briefing-health">
-                {Array.from({ length: 10 }, (_, index) => (
-                  <div key={index} className="cr2-health-pip" data-filled={index < companyHealth} />
-                ))}
-                <span>{companyHealth}/10</span>
+          <div className="cr2-briefing-company">
+            <p className="cr2-briefing-col-title">내 회사 상황</p>
+            {[
+              ['현금', fmt(capital)],
+              ['부채', fmt(debt)],
+              ['브랜드', `${Math.round(brandValue)}pt`],
+              ['품질', `${Math.round(qualityScore)}pt`],
+              ['점유율', `${((lastSettlement?.myShare ?? 0) * 100).toFixed(1)}%`],
+            ].map(([label, value]) => (
+              <div key={label} className="cr2-briefing-stat-row">
+                <span>{label}</span>
+                <span>{value}</span>
               </div>
+            ))}
+
+            <div className="cr2-briefing-health">
+              {Array.from({ length: 10 }, (_, index) => (
+                <div key={index} className="cr2-health-pip" data-filled={index < companyHealth} />
+              ))}
+              <span>{companyHealth}/10</span>
             </div>
           </div>
-
-          <div className="cr2-briefing-footer">
-            <button type="button" className="cr2-btn-secondary" onClick={() => setBriefingOpen(false)}>
-              현상황 닫기
-            </button>
-            <button type="button" className="cr2-btn-ghost" onClick={() => setBriefingOpen(false)}>
-              돌아가기 ↩
-            </button>
-          </div>
         </div>
-      ) : null}
+      </div>
+
+      <div className="cr2-shop-footer">
+        <button
+          type="button"
+          className="cr2-btn-primary"
+          disabled={!rewardSelection}
+          onClick={continueFromShop}
+        >
+          보상 확정 →
+        </button>
+      </div>
     </section>
   )
 }

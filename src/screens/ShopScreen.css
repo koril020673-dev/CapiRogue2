@@ -5,8 +5,7 @@
 }
 
 .cr2-shop-header,
-.cr2-shop-footer,
-.cr2-briefing-footer {
+.cr2-shop-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -59,8 +58,7 @@
 }
 
 .cr2-credit-item button,
-.cr2-shop-footer button,
-.cr2-briefing-footer button {
+.cr2-shop-footer button {
   padding: 11px 14px;
   border-radius: 14px;
   border: 1px solid var(--cr2-border);
@@ -152,7 +150,6 @@
   border: 1px solid var(--cr2-border);
   border-radius: 24px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), var(--cr2-s2));
-  animation: cr2-slide-up 0.25s cubic-bezier(.22, 1, .36, 1);
 }
 
 .cr2-briefing-summary {
@@ -226,22 +223,6 @@
   background: var(--cr2-positive);
 }
 
-.cr2-btn-ghost {
-  background: transparent;
-}
-
-@keyframes cr2-slide-up {
-  from {
-    transform: translateY(100%);
-    opacity: 0.25;
-  }
-
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
 @media (max-width: 960px) {
   .cr2-shop-reward-row,
   .cr2-briefing-body {
@@ -251,8 +232,7 @@
 
 @media (max-width: 640px) {
   .cr2-shop-header,
-  .cr2-shop-footer,
-  .cr2-briefing-footer {
+  .cr2-shop-footer {
     flex-direction: column;
     align-items: stretch;
   }
