@@ -37,6 +37,37 @@ export function clearSaveSlot() {
   }
 }
 
+export function saveGame(state) {
+  saveSaveSlot({
+    floor: state.floor,
+    floorStage: state.floorStage,
+    advisor: state.advisor,
+    capital: state.capital,
+    debt: state.debt,
+    brandValue: state.brandValue,
+    qualityScore: state.qualityScore,
+    companyHealth: state.companyHealth,
+    momentum: state.momentum,
+    credits: state.credits,
+    econPhase: state.econPhase,
+    rivals: state.rivals,
+    profitHistory: state.profitHistory,
+    timestamp: Date.now(),
+  })
+}
+
+export function loadGame() {
+  return loadSaveSlot()
+}
+
+export function hasSave() {
+  return hasSaveSlot()
+}
+
+export function deleteSave() {
+  clearSaveSlot()
+}
+
 export function loadRunHistory() {
   try {
     const parsed = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')
@@ -49,6 +80,22 @@ export function loadRunHistory() {
 export function appendRunHistory(entry) {
   const current = loadRunHistory()
   const next = [entry, ...current].slice(0, 30)
+
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
+  } catch {
+    // Ignore storage write errors.
+  }
+
+  return next
+}
+
+export function loadPlayHistory() {
+  return loadRunHistory()
+}
+
+export function savePlayHistory(history) {
+  const next = Array.isArray(history) ? history.slice(-50) : []
 
   try {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(next))

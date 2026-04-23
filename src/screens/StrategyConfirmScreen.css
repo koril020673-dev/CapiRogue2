@@ -35,6 +35,7 @@
 }
 
 .cr2-confirm-screen__preview,
+.cr2-confirm-screen__custom-order,
 .cr2-confirm-screen__question,
 .cr2-confirm-screen__fallback {
   display: grid;
@@ -63,6 +64,36 @@
 .cr2-confirm-screen__preview-grid span,
 .cr2-confirm-screen__preview-empty {
   color: var(--cr2-neutral);
+}
+
+.cr2-confirm-screen__custom-order {
+  grid-template-columns: auto minmax(120px, 180px) 1fr;
+  align-items: center;
+}
+
+.cr2-confirm-screen__custom-order label {
+  color: var(--cr2-text);
+  font-weight: 800;
+}
+
+.cr2-confirm-screen__custom-order input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cr2-text);
+  font: inherit;
+}
+
+.cr2-confirm-screen__custom-order span,
+.cr2-confirm-screen__custom-order small {
+  color: var(--cr2-neutral);
+}
+
+.cr2-confirm-screen__custom-order small {
+  grid-column: 2 / -1;
+  color: var(--cr2-warning);
 }
 
 .cr2-confirm-screen__preview-grid strong {
@@ -106,5 +137,13 @@
 
   .cr2-confirm-screen__preview-grid {
     grid-template-columns: 1fr;
+  }
+
+  .cr2-confirm-screen__custom-order {
+    grid-template-columns: 1fr;
+  }
+
+  .cr2-confirm-screen__custom-order small {
+    grid-column: auto;
   }
 }

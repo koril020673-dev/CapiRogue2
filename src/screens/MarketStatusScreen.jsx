@@ -24,6 +24,7 @@ export function MarketStatusScreen() {
   const momentum = useGameStore((state) => state.momentum)
   const activeBlackSwan = useGameStore((state) => state.activeBlackSwan)
   const activeEffects = useGameStore((state) => state.activeEffects)
+  const eventDemandMul = useGameStore((state) => state._eventDemandMul ?? 1)
   const consumerGroupRatios = useGameStore((state) => state.consumerGroupRatios)
   const rivals = useGameStore((state) => state.rivals)
   const goToCompanyStage = useGameStore((state) => state.goToCompanyStage)
@@ -34,7 +35,7 @@ export function MarketStatusScreen() {
     industryTier,
     momentumMul: 1 + getMomentumEffect(momentum).demandMul,
     blackSwanMul: activeBlackSwan?.demandMul ?? 1,
-    eventMul: 1 + getEffectValue(activeEffects, 'demandMul'),
+    eventMul: (1 + getEffectValue(activeEffects, 'demandMul')) * eventDemandMul,
   })
 
   const activeRivals = (rivals ?? [])

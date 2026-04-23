@@ -5,6 +5,7 @@ import {
   RIVAL_TIERS,
   createRivalState,
 } from '../constants/rivals.js'
+import { VENDOR } from '../constants/strategies.js'
 import { calcAttraction } from './marketEngine.js'
 
 const SHARE_DAMAGE_RATIO = 0.06
@@ -13,6 +14,83 @@ const BASE_FIXED_COST = {
   2: 950000,
   3: 1450000,
   4: 2100000,
+}
+
+const RIVAL_STRATEGY_LABEL = {
+  dumping: '박리다매',
+  branding: '브랜딩',
+  quality: '품질',
+}
+
+export function calcRivalStrategy(rival, econPhase) {
+  const { tier } = rival
+  const isRecession = ['recession', 'contraction'].includes(econPhase)
+  const isBoom = ['boom', 'growth'].includes(econPhase)
+
+  switch (tier) {
+    case 1:
+      return {
+        strategy: 'dumping',
+        priceMul: isRecession ? 0.7 : 0.85,
+        qualityBonus: 0,
+        brandBonus: 0,
+      }
+    case 2:
+      if (rival.focus === 'brand') {
+        return {
+          strategy: 'branding',
+          priceMul: isBoom ? 1.6 : 1.3,
+          brandBonus: isBoom ? 8 : 4,
+          qualityBonus: 0,
+        }
+      }
+
+      return {
+        strategy: 'quality',
+        priceMul: isBoom ? 1.8 : 1.4,
+        qualityBonus: isBoom ? 5 : 3,
+        brandBonus: 0,
+      }
+    case 3:
+      if (isRecession) {
+        return {
+          strategy: 'dumping',
+          priceMul: 0.9,
+          brandBonus: 3,
+          qualityBonus: 0,
+        }
+      }
+
+      return {
+        strategy: 'branding',
+        priceMul: 1.7,
+        brandBonus: 6,
+        qualityBonus: 4,
+      }
+    case 4:
+      return {
+        strategy: isBoom ? 'quality' : isRecession ? 'dumping' : 'branding',
+        priceMul: isBoom ? 2.0 : isRecession ? 0.85 : 1.5,
+        brandBonus: isBoom ? 5 : 3,
+        qualityBonus: isBoom ? 6 : isRecession ? 0 : 4,
+      }
+    default:
+      return {
+        strategy: 'dumping',
+        priceMul: 0.85,
+        qualityBonus: 0,
+        brandBonus: 0,
+      }
+  }
+}
+
+function getRivalStrategyPrice(rival, econPhase) {
+  const plan = calcRivalStrategy(rival, econPhase)
+  return clamp(Math.round(VENDOR.baseUnitCost * plan.priceMul), 8000, 220000)
+}
+
+function getRivalStrategyLabel(strategy) {
+  return RIVAL_STRATEGY_LABEL[strategy] ?? strategy
 }
 
 function getPriceTarget(rival, playerPrice = 0) {
@@ -71,22 +149,31 @@ export function getActiveRivals(rivals = []) {
 }
 
 export function buildRivalPlayers({ econPhase, itemCategory, rivals = [] }) {
-  return getActiveRivals(rivals).map((rival) => ({
-    id: rival.id,
-    name: rival.name,
-    tier: rival.tier,
-    qualityScore: rival.qualityScore,
-    brandValue: rival.brandValue,
-    sellPrice: rival.currentPrice,
-    attraction: calcAttraction({
-      quality: rival.qualityScore,
-      brand: rival.brandValue,
-      sellPrice: rival.currentPrice,
-      resistance: 0.04 + rival.tier * 0.02,
-      category: itemCategory,
-      econPhase,
-    }),
-  }))
+  return getActiveRivals(rivals).map((rival) => {
+    const strategy = calcRivalStrategy(rival, econPhase)
+    const sellPrice = getRivalStrategyPrice(rival, econPhase)
+    const qualityScore = Math.max(0, rival.qualityScore + strategy.qualityBonus)
+    const brandValue = Math.max(0, rival.brandValue + strategy.brandBonus)
+
+    return {
+      id: rival.id,
+      name: rival.name,
+      tier: rival.tier,
+      qualityScore,
+      brandValue,
+      sellPrice,
+      strategy: strategy.strategy,
+      strategyLabel: getRivalStrategyLabel(strategy.strategy),
+      attraction: calcAttraction({
+        quality: qualityScore,
+        brand: brandValue,
+        sellPrice,
+        resistance: 0.04 + rival.tier * 0.02,
+        category: itemCategory,
+        econPhase,
+      }),
+    }
+  })
 }
 
 export function updateRivalsFromSettlement({
@@ -94,6 +181,7 @@ export function updateRivalsFromSettlement({
   totalDemand = 0,
   salesByRivalId = {},
   playerPrice = 0,
+  econPhase = 'stable',
 }) {
   return rivals.map((rival) => {
     if (!rival.active || rival.bankrupt || rival.eliminated) {
@@ -107,10 +195,15 @@ export function updateRivalsFromSettlement({
     const nextCapital = Math.max(0, rival.capital + revenue - variableCost - fixedCost)
     const ratio = nextCapital / Math.max(rival.initialCapital, 1)
     const bankrupt = nextCapital <= 0
-    const nextPrice = clamp(getPriceTarget(rival, playerPrice), 18000, 220000)
+    const strategy = calcRivalStrategy(rival, econPhase)
+    const nextPrice = playerPrice
+      ? clamp(Math.round((getPriceTarget(rival, playerPrice) + getRivalStrategyPrice(rival, econPhase)) / 2), 8000, 220000)
+      : getRivalStrategyPrice(rival, econPhase)
 
     return {
       ...rival,
+      strategy: strategy.strategy,
+      strategyLabel: getRivalStrategyLabel(strategy.strategy),
       currentPrice: nextPrice,
       sellPrice: nextPrice,
       capital: nextCapital,

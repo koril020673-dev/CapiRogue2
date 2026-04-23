@@ -5,10 +5,15 @@ import { useGameStore } from '../store/useGameStore.js'
 export function DocEventTray() {
   const eventState = useGameStore((state) => state.eventState)
   const openEventCard = useGameStore((state) => state.openEventCard)
+  const offeredIds = eventState?.offeredIds ?? []
+
+  if (offeredIds.length === 0 || typeof openEventCard !== 'function') {
+    return null
+  }
 
   return (
     <div className="cr2-event-tray">
-      {eventState.offeredIds.map((cardId, slotIndex) => {
+      {offeredIds.map((cardId, slotIndex) => {
         const card = getEventCardById(cardId)
 
         if (!card) {

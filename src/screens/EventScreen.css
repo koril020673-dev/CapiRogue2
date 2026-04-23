@@ -1,0 +1,168 @@
+.cr2-event-screen {
+  display: grid;
+  gap: 16px;
+}
+
+.cr2-event-screen__head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.cr2-event-screen__eyebrow {
+  color: var(--cr2-dim);
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cr2-event-screen__head h2 {
+  color: var(--cr2-text);
+}
+
+.cr2-situation-event,
+.cr2-player-event,
+.cr2-no-player-event {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 18px 20px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 22px;
+  background: var(--cr2-s2);
+}
+
+.cr2-situation-event {
+  border-color: rgba(240, 165, 0, 0.34);
+}
+
+.cr2-situation-event--empty {
+  color: var(--cr2-neutral);
+}
+
+.cr2-player-event {
+  border-color: rgba(91, 141, 239, 0.42);
+}
+
+.cr2-event-header {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cr2-event-header[data-type='situation'] {
+  color: var(--cr2-warning);
+}
+
+.cr2-event-header[data-type='player'] {
+  color: var(--cr2-accent);
+}
+
+.cr2-event-auto-badge {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--cr2-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.cr2-event-name {
+  color: var(--cr2-text);
+  font-size: 1.16rem;
+  font-weight: 800;
+}
+
+.cr2-event-desc {
+  color: var(--cr2-neutral);
+  line-height: 1.6;
+}
+
+.cr2-event-effect-preview {
+  width: fit-content;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cr2-negative);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.cr2-event-hint {
+  color: var(--cr2-dim);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.cr2-event-choices {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.cr2-event-choice-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid var(--cr2-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cr2-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease;
+}
+
+.cr2-event-choice-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cr2-event-choice-btn[data-type='safe']:hover {
+  border-color: var(--cr2-neutral);
+}
+
+.cr2-event-choice-btn[data-type='normal']:hover {
+  border-color: var(--cr2-accent);
+}
+
+.cr2-event-choice-btn[data-type='gamble']:hover {
+  border-color: var(--cr2-warning);
+}
+
+.cr2-event-choice-btn[data-type='absurd']:hover {
+  border-color: var(--cr2-purple, #b477ff);
+}
+
+.cr2-choice-label {
+  color: var(--cr2-text);
+  font-weight: 700;
+}
+
+.cr2-choice-type-badge {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--cr2-dim);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.cr2-no-player-event {
+  align-items: center;
+  justify-items: center;
+  color: var(--cr2-neutral);
+  text-align: center;
+}

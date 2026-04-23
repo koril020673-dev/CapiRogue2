@@ -18,7 +18,7 @@ export function CompanyStatusScreen() {
   const lastSettlement = useGameStore((state) => state.lastSettlement)
   const lastGroupShares = useGameStore((state) => state.lastGroupShares)
   const warningAlerts = useGameStore((state) => state.warningAlerts)
-  const goToStrategyStage = useGameStore((state) => state.goToStrategyStage)
+  const generateFloorEvents = useGameStore((state) => state.generateFloorEvents)
 
   return (
     <section className="cr2-company-screen cr2-game__panel">
@@ -102,8 +102,8 @@ export function CompanyStatusScreen() {
       </section>
 
       <div className="cr2-company-screen__footer">
-        <button type="button" className="cr2-company-screen__next" onClick={goToStrategyStage}>
-          전략 선택 →
+        <button type="button" className="cr2-company-screen__next" onClick={generateFloorEvents}>
+          이벤트 확인 →
         </button>
       </div>
     </section>

@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import './StrategyConfirmScreen.css'
 import { OrderSelect } from '../components/OrderSelect.jsx'
 import { STRATEGIES } from '../constants/strategies.js'
+import { MAX_ORDER_MUL } from '../logic/settlementEngine.js'
 import { useGameStore } from '../store/useGameStore.js'
 
 function formatMoney(value) {
@@ -12,13 +14,38 @@ function formatMoney(value) {
 export function StrategyConfirmScreen() {
   const selectedStrategyId = useGameStore((state) => state.selectedStrategyId)
   const selectedOrderTier = useGameStore((state) => state.selectedOrderTier)
+  const customOrderQty = useGameStore((state) => state.customOrderQty)
+  const currentEventResolved = useGameStore((state) => state.currentEventResolved)
   const lastEventResult = useGameStore((state) => state.lastEventResult)
   const getStrategyPreview = useGameStore((state) => state.getStrategyPreview)
+  const getOrderLimit = useGameStore((state) => state.getOrderLimit)
+  const setCustomOrderQty = useGameStore((state) => state.setCustomOrderQty)
   const confirmTurn = useGameStore((state) => state.confirmTurn)
   const returnToStrategyStage = useGameStore((state) => state.returnToStrategyStage)
 
   const strategy = STRATEGIES[selectedStrategyId]
   const preview = getStrategyPreview()
+  const maxOrder = getOrderLimit()
+  const [orderWarning, setOrderWarning] = useState('')
+
+  const handleCustomOrderChange = (event) => {
+    const rawValue = event.target.value
+    if (rawValue === '') {
+      setCustomOrderQty('')
+      setOrderWarning('')
+      return
+    }
+
+    const nextValue = Math.max(1, Math.round(Number.parseInt(rawValue, 10) || 1))
+    if (nextValue > maxOrder) {
+      setCustomOrderQty(String(maxOrder))
+      setOrderWarning(`최대 ${maxOrder.toLocaleString()}개까지 발주 가능합니다.`)
+      return
+    }
+
+    setCustomOrderQty(String(nextValue))
+    setOrderWarning('')
+  }
 
   if (!strategy) {
     return (
@@ -46,6 +73,23 @@ export function StrategyConfirmScreen() {
       </div>
 
       <OrderSelect />
+
+      <section className="cr2-confirm-screen__custom-order">
+        <label htmlFor="cr2-custom-order">직접 입력</label>
+        <input
+          id="cr2-custom-order"
+          type="number"
+          min="1"
+          max={maxOrder}
+          value={customOrderQty}
+          onChange={handleCustomOrderChange}
+          placeholder="발주량"
+        />
+        <span>
+          최대 {maxOrder.toLocaleString()}개 (수요 예측 x {MAX_ORDER_MUL})
+        </span>
+        {orderWarning ? <small>{orderWarning}</small> : null}
+      </section>
 
       <section className="cr2-confirm-screen__preview">
         <h3>예상 결과</h3>
@@ -75,7 +119,11 @@ export function StrategyConfirmScreen() {
           <button
             type="button"
             className="cr2-confirm-screen__action cr2-confirm-screen__action--primary"
-            disabled={!selectedOrderTier}
+            disabled={
+              !currentEventResolved ||
+              !selectedOrderTier ||
+              (selectedOrderTier === 'custom' && !customOrderQty)
+            }
             onClick={confirmTurn}
           >
             Y - 정산 시작

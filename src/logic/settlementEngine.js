@@ -8,6 +8,19 @@ const QUALITY_MUL = {
 
 const FACTORY_DISCOUNT = 0.6
 
+export const MAX_ORDER_MUL = 1.3
+
+export function calcSellPrice(strategy, vendorBase = VENDOR.baseUnitCost) {
+  if (!strategy) {
+    return vendorBase
+  }
+
+  return Math.max(
+    10000,
+    Math.round(vendorBase * (strategy.effect?.priceMul ?? strategy.sellPriceMul ?? strategy.priceMul ?? 1)),
+  )
+}
+
 export function getOrderOptions(strategy, demandEstimate) {
   if (!strategy) {
     return {
@@ -46,6 +59,7 @@ export function calcSettlement({
   vendorUnitCost,
   qualityMode,
   factoryActive,
+  eventCostMul = 1,
   monthlyInterest,
   monthlyRent,
   safetyCost,
@@ -55,7 +69,7 @@ export function calcSettlement({
 }) {
   const qualityMul = QUALITY_MUL[qualityMode] ?? 1
   const discount = factoryActive ? FACTORY_DISCOUNT : 1
-  const unitCost = Math.round(vendorUnitCost * qualityMul * discount)
+  const unitCost = Math.round(vendorUnitCost * qualityMul * discount * eventCostMul)
   const prepayment = unitCost * orderQty
   const waste = Math.max(0, orderQty - actualSold)
   const wasteCost = unitCost * waste

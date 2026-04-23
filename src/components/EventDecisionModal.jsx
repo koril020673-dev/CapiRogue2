@@ -7,9 +7,9 @@ export function EventDecisionModal() {
   const closeEventCard = useGameStore((state) => state.closeEventCard)
   const resolveEventChoice = useGameStore((state) => state.resolveEventChoice)
 
-  const card = getEventCardById(eventState.openCardId)
+  const card = getEventCardById(eventState?.openCardId)
 
-  if (!card) {
+  if (!card || typeof closeEventCard !== 'function') {
     return null
   }
 
@@ -51,9 +51,11 @@ export function EventDecisionModal() {
               key={choice.id}
               type="button"
               className="cr2-event-modal__choice"
-              onClick={() =>
-                resolveEventChoice(card.id, eventState.openSlotIndex ?? 0, choice.id)
-              }
+              onClick={() => {
+                if (typeof resolveEventChoice === 'function') {
+                  resolveEventChoice(choice.id)
+                }
+              }}
             >
               <strong>{choice.label}</strong>
               <span>{choice.probabilityHint}</span>

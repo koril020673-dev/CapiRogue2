@@ -15,6 +15,7 @@ import {
   calcGroupDemandBreakdown,
 } from '../logic/demandEngine.js'
 import { advanceEconPhase } from '../logic/econEngine.js'
+import { drawEventCards } from '../logic/eventEngine.js'
 import { applyHealth, calcHealthDelta } from '../logic/healthEngine.js'
 import { calcAttraction } from '../logic/marketEngine.js'
 import {
@@ -47,7 +48,7 @@ import {
   saveSaveSlot,
   saveSettings,
 } from '../logic/saveEngine.js'
-import { calcSettlement } from '../logic/settlementEngine.js'
+import { calcSellPrice, calcSettlement, MAX_ORDER_MUL } from '../logic/settlementEngine.js'
 import { getEducationHint } from '../constants/educationHints.js'
 
 const MAX_HEALTH = 10
@@ -63,6 +64,16 @@ const EMPTY_GROUP_SHARES = {
   value: 0,
   general: 0,
 }
+
+const FLOOR_STAGES = new Set([
+  'market',
+  'company',
+  'event',
+  'strategy',
+  'confirm',
+  'settlement',
+  'shop',
+])
 
 function createToast(message, tone = 'neutral') {
   return {
@@ -245,10 +256,13 @@ function createBaseState() {
     },
     selectedStrategyId: null,
     selectedOrderTier: null,
+    customOrderQty: '',
     currentEventCardId: null,
     currentEventResolved: false,
     currentEventChoiceId: null,
     lastEventResult: null,
+    currentSituationEvent: null,
+    currentPlayerEvent: null,
     rivals: createInitialRivals(),
     activeEconomicWar: null,
     activeBlackSwan: null,
@@ -271,6 +285,16 @@ function createBaseState() {
     shopPurchasesThisFloor: [],
     _fixedCostMul: 1,
     _interestMul: 1,
+    _eventCostMul: 1,
+    _eventCostDuration: 0,
+    _eventDemandMul: 1,
+    _eventDemandDuration: 0,
+    _eventInterestRateAdd: 0,
+    _eventInterestDuration: 0,
+    _shutdownLeft: 0,
+    _pendingPlayerChoice: null,
+    _lastEventResult: null,
+    _eventsGeneratedFloor: null,
     warningAlerts: [],
     toasts: [],
     decisionLog: [],
@@ -302,13 +326,76 @@ function createRunState({ advisor, meta, legacyCards, settings, playHistory }) {
   )
 
   const rivals = ensureRivalsJoined(base.rivals, 1)
-  const currentEventCardId = drawCurrentEvent({ ...base, rivals })
 
   return {
     ...base,
     rivals,
-    currentEventCardId,
     warningAlerts: getWarningAlerts({ ...base, rivals }),
+  }
+}
+
+function normalizeRivalsForLoad(rivals, floor) {
+  if (Array.isArray(rivals)) {
+    return ensureRivalsJoined(rivals, floor)
+  }
+
+  return ensureRivalsJoined(createInitialRivals(), floor)
+}
+
+function normalizeLoadedRunState(saved) {
+  const base = createBaseState()
+  const floor = clamp(Math.round(Number(saved?.floor) || base.floor), 1, base.maxFloors)
+  const eventsGenerated = saved?._eventsGeneratedFloor === floor
+  const loadedStage = FLOOR_STAGES.has(saved?.floorStage) ? saved.floorStage : 'market'
+  const mustReplayEventGate =
+    ['event', 'strategy', 'confirm'].includes(loadedStage) &&
+    !eventsGenerated &&
+    !saved?.currentEventResolved
+  const missingSettlement = ['settlement', 'shop'].includes(loadedStage) && !saved?.lastSettlement
+  const floorStage = mustReplayEventGate || missingSettlement ? 'market' : loadedStage
+  const currentPlayerEvent = eventsGenerated ? saved?.currentPlayerEvent ?? null : null
+
+  return {
+    ...base,
+    ...saved,
+    screen: 'game',
+    gameStatus: 'playing',
+    floor,
+    floorStage,
+    vendor: VENDOR,
+    factory: {
+      ...base.factory,
+      ...(saved?.factory ?? {}),
+    },
+    marketing: {
+      ...base.marketing,
+      ...(saved?.marketing ?? {}),
+    },
+    rivals: normalizeRivalsForLoad(saved?.rivals, floor),
+    activeEffects: Array.isArray(saved?.activeEffects) ? saved.activeEffects : [],
+    profitHistory: Array.isArray(saved?.profitHistory) ? saved.profitHistory : [],
+    currentRewards: Array.isArray(saved?.currentRewards) ? saved.currentRewards : [],
+    shopPurchasesThisFloor: Array.isArray(saved?.shopPurchasesThisFloor)
+      ? saved.shopPurchasesThisFloor
+      : [],
+    currentSituationEvent: eventsGenerated ? saved?.currentSituationEvent ?? null : null,
+    currentPlayerEvent,
+    currentEventResolved: Boolean(saved?.currentEventResolved || (eventsGenerated && !currentPlayerEvent)),
+    currentEventChoiceId: saved?.currentEventChoiceId ?? null,
+    currentEventCardId: null,
+    selectedStrategyId: saved?.selectedStrategyId ?? null,
+    selectedOrderTier: saved?.selectedOrderTier ?? null,
+    customOrderQty: saved?.customOrderQty ?? '',
+    _eventCostMul: saved?._eventCostMul ?? 1,
+    _eventCostDuration: saved?._eventCostDuration ?? 0,
+    _eventDemandMul: saved?._eventDemandMul ?? 1,
+    _eventDemandDuration: saved?._eventDemandDuration ?? 0,
+    _eventInterestRateAdd: saved?._eventInterestRateAdd ?? 0,
+    _eventInterestDuration: saved?._eventInterestDuration ?? 0,
+    _shutdownLeft: saved?._shutdownLeft ?? 0,
+    _pendingPlayerChoice: null,
+    _lastEventResult: saved?._lastEventResult ?? null,
+    _eventsGeneratedFloor: eventsGenerated ? floor : null,
   }
 }
 
@@ -398,6 +485,115 @@ function applyEventEffects(state, effects = {}) {
   return nextState
 }
 
+function getEventCostMultiplier(state) {
+  return state._eventCostMul ?? 1
+}
+
+function getEventDemandMultiplier(state) {
+  return state._eventDemandMul ?? 1
+}
+
+function getEventInterestRate(state) {
+  return state.interestRate + (state._eventInterestRateAdd ?? 0)
+}
+
+function getDemandMultiplier(state) {
+  return (1 + getEffectValue(state, 'demandMul')) * getEventDemandMultiplier(state)
+}
+
+function applyAutoEffect(state, effect) {
+  if (!effect) {
+    return {}
+  }
+
+  const duration = effect.duration ?? 1
+  const updates = {}
+
+  if (effect.costMul) {
+    updates._eventCostMul = (state._eventCostMul ?? 1) * effect.costMul
+    updates._eventCostDuration = Math.max(state._eventCostDuration ?? 0, duration)
+  }
+
+  if (effect.demandMul) {
+    updates._eventDemandMul = (state._eventDemandMul ?? 1) * effect.demandMul
+    updates._eventDemandDuration = Math.max(state._eventDemandDuration ?? 0, duration)
+  }
+
+  if (effect.interestRateAdd) {
+    updates._eventInterestRateAdd = (state._eventInterestRateAdd ?? 0) + effect.interestRateAdd
+    updates._eventInterestDuration = Math.max(state._eventInterestDuration ?? 0, duration)
+  }
+
+  return updates
+}
+
+function applyPlayerEventEffect(state, result) {
+  const updates = {}
+
+  switch (result.effect) {
+    case 'capital':
+      updates.capital = result.v === -999 ? Math.floor(state.capital * 0.5) : state.capital + result.v
+      break
+    case 'brand':
+      updates.brandValue = Math.max(0, state.brandValue + result.v)
+      break
+    case 'quality':
+      updates.qualityScore = Math.max(0, state.qualityScore + result.v)
+      break
+    case 'resist':
+      updates.priceResistance = Math.min(0.5, state.priceResistance + result.v)
+      break
+    case 'demandMul':
+      updates._eventDemandMul = (state._eventDemandMul ?? 1) * (1 + result.v)
+      updates._eventDemandDuration = Math.max(state._eventDemandDuration ?? 0, 1)
+      break
+    case 'costMul':
+      updates._eventCostMul = (state._eventCostMul ?? 1) * (1 + result.v)
+      updates._eventCostDuration = Math.max(state._eventCostDuration ?? 0, 1)
+      break
+    case 'shutdown':
+      updates._shutdownLeft = Math.max(state._shutdownLeft ?? 0, result.v)
+      break
+    case 'none':
+    default:
+      break
+  }
+
+  return updates
+}
+
+function decrementTimedEventFields(state) {
+  const costDuration = Math.max(0, (state._eventCostDuration ?? 0) - 1)
+  const demandDuration = Math.max(0, (state._eventDemandDuration ?? 0) - 1)
+  const interestDuration = Math.max(0, (state._eventInterestDuration ?? 0) - 1)
+
+  return {
+    _eventCostMul: costDuration > 0 ? state._eventCostMul ?? 1 : 1,
+    _eventCostDuration: costDuration,
+    _eventDemandMul: demandDuration > 0 ? state._eventDemandMul ?? 1 : 1,
+    _eventDemandDuration: demandDuration,
+    _eventInterestRateAdd: interestDuration > 0 ? state._eventInterestRateAdd ?? 0 : 0,
+    _eventInterestDuration: interestDuration,
+    _shutdownLeft: Math.max(0, (state._shutdownLeft ?? 0) - 1),
+  }
+}
+
+function drawOutcome(outcomes = []) {
+  if (outcomes.length === 0) {
+    return null
+  }
+
+  let cursor = Math.random()
+  for (const outcome of outcomes) {
+    cursor -= outcome.p
+    if (cursor <= 0) {
+      return outcome
+    }
+  }
+
+  return outcomes[outcomes.length - 1]
+}
+
 function applyRewardEffect(state, reward) {
   const nextState = {
     ...state,
@@ -451,33 +647,42 @@ function getOrderMultipliers(strategyId) {
 
 function composeTurnPlan(state, strategyId, orderTierId = state.selectedOrderTier) {
   const strategy = STRATEGIES[strategyId]
-  const orderTier = ORDER_TIERS[orderTierId]
-  if (!strategy || !orderTier) {
+  if (!strategy) {
     return null
   }
 
   const momentumMul = 1 + getMomentumEffect(state.momentum).demandMul
   const blackSwanMul = state.activeBlackSwan?.demandMul ?? 1
-  const eventMul = 1 + getEffectValue(state, 'demandMul')
   const demandEstimate = calcDemandEstimate({
     category: state.itemCategory,
     econPhase: state.econPhase,
     industryTier: state.industryTier,
     momentumMul,
     blackSwanMul,
-    eventMul,
+    eventMul: getDemandMultiplier(state),
   })
 
   const vendorUnitCost = Math.round(
     VENDOR.baseUnitCost * (1 + getEffectValue(state, 'tempCostMul')),
   )
-  const orderMul = getOrderMultipliers(strategyId)[orderTier.index] ?? 1
-  const orderCapMul = strategy.effect?.orderCapMul ?? 1
-  const orderQty = Math.max(12, Math.round(demandEstimate * orderMul * orderCapMul))
-  const sellPrice = Math.max(
-    10000,
-    Math.round(vendorUnitCost * (strategy.effect?.priceMul ?? strategy.sellPriceMul ?? 1)),
-  )
+  const eventCostMul = getEventCostMultiplier(state)
+  let orderQty = 0
+
+  if (orderTierId === 'custom') {
+    const maxOrderQty = Math.max(1, Math.round(demandEstimate * MAX_ORDER_MUL))
+    orderQty = clamp(Math.round(Number(state.customOrderQty) || 0), 1, maxOrderQty)
+  } else {
+    const orderTier = ORDER_TIERS[orderTierId]
+    if (!orderTier) {
+      return null
+    }
+
+    const orderMul = getOrderMultipliers(strategyId)[orderTier.index] ?? 1
+    const orderCapMul = strategy.effect?.orderCapMul ?? 1
+    orderQty = Math.max(12, Math.round(demandEstimate * orderMul * orderCapMul))
+  }
+
+  const sellPrice = calcSellPrice(strategy, vendorUnitCost)
 
   return {
     strategyId,
@@ -489,9 +694,11 @@ function composeTurnPlan(state, strategyId, orderTierId = state.selectedOrderTie
     previewUnitCost: Math.round(
       vendorUnitCost *
         (strategy.qualityMode === 'premium' ? 1.5 : strategy.qualityMode === 'budget' ? 0.8 : 1) *
-        (state.factory.built ? 0.6 : 1),
+        (state.factory.built ? 0.6 : 1) *
+        eventCostMul,
     ),
     demandEstimate,
+    eventCostMul,
   }
 }
 
@@ -529,6 +736,7 @@ function buildDemandRatioMultipliers(strategyId) {
 }
 
 function prepareNextFloorState(state, { keepEffects = true } = {}) {
+  const timedEventFields = decrementTimedEventFields(state)
   const base = {
     ...state,
     floorStage: 'market',
@@ -537,6 +745,7 @@ function prepareNextFloorState(state, { keepEffects = true } = {}) {
     lastEventResult: null,
     selectedStrategyId: null,
     selectedOrderTier: null,
+    customOrderQty: '',
     currentRewards: [],
     rewardPending: null,
     rewardSelection: null,
@@ -544,26 +753,17 @@ function prepareNextFloorState(state, { keepEffects = true } = {}) {
     shopPurchasesThisFloor: [],
     previewOpen: false,
     currentEventCardId: null,
+    currentSituationEvent: null,
+    currentPlayerEvent: null,
+    _pendingPlayerChoice: null,
+    _lastEventResult: null,
+    _eventsGeneratedFloor: null,
+    ...timedEventFields,
     activeEffects: keepEffects ? state.activeEffects : [],
-  }
-
-  let nextEffects = base.activeEffects
-  if (hasEffect(base, 'rerollEvent')) {
-    const firstPick = drawCurrentEvent({ ...base, activeEffects: nextEffects })
-    const secondPick = drawCurrentEvent({
-      ...base,
-      currentEventCardId: firstPick,
-      activeEffects: nextEffects,
-    })
-    base.currentEventCardId = secondPick ?? firstPick
-    nextEffects = consumeSingleEffect(nextEffects, 'rerollEvent')
-  } else {
-    base.currentEventCardId = drawCurrentEvent(base)
   }
 
   return {
     ...base,
-    activeEffects: nextEffects,
     warningAlerts: getWarningAlerts(base),
   }
 }
@@ -694,9 +894,9 @@ export const useGameStore = create((set, get) => {
         return
       }
 
+      const normalized = normalizeLoadedRunState(saved)
       set((state) => ({
-        ...createBaseState(),
-        ...saved,
+        ...normalized,
         auth: state.auth,
         screen: 'game',
         gameStatus: 'playing',
@@ -789,6 +989,9 @@ export const useGameStore = create((set, get) => {
       set((state) => ({
         ...state,
         floorStage: 'strategy',
+        currentEventResolved:
+          state.currentEventResolved ||
+          (state._eventsGeneratedFloor === state.floor && !state.currentPlayerEvent),
       })),
 
     returnToStrategyStage: () =>
@@ -796,10 +999,72 @@ export const useGameStore = create((set, get) => {
         ...state,
         floorStage: 'strategy',
         selectedOrderTier: null,
-        currentEventResolved: false,
+        customOrderQty: '',
+        currentEventResolved: state._eventsGeneratedFloor === state.floor,
+      })),
+
+    generateFloorEvents: () => {
+      const state = get()
+      if (state._eventsGeneratedFloor === state.floor) {
+        set((current) => ({
+          ...current,
+          floorStage: 'event',
+        }))
+        return
+      }
+
+      const { situationCard, playerCard } = drawEventCards(state)
+      const effectUpdates = applyAutoEffect(state, situationCard?.autoEffect)
+      const nextState = {
+        ...state,
+        ...effectUpdates,
+        currentSituationEvent: situationCard,
+        currentPlayerEvent: playerCard,
+        currentEventResolved: !playerCard,
         currentEventChoiceId: null,
         lastEventResult: null,
-      })),
+        _lastEventResult: null,
+        _pendingPlayerChoice: null,
+        _eventsGeneratedFloor: state.floor,
+        floorStage: 'event',
+      }
+
+      set(nextState)
+      saveSaveSlot(buildSaveSnapshot(nextState))
+    },
+
+    resolvePlayerEvent: (choiceId) => {
+      const state = get()
+      const event = state.currentPlayerEvent
+      const choice = event?.choices?.find((entry) => entry.id === choiceId)
+      const result = drawOutcome(choice?.outcomes)
+      if (!event || !choice || !result) {
+        return
+      }
+
+      const effectUpdates = applyPlayerEventEffect(state, result)
+      const nextState = {
+        ...state,
+        ...effectUpdates,
+        currentPlayerEvent: null,
+        currentEventResolved: true,
+        currentEventChoiceId: choiceId,
+        lastEventResult: {
+          cardId: event.id,
+          choiceId,
+          success: true,
+          message: result.msg,
+          effects: {},
+        },
+        _lastEventResult: result.msg,
+        _pendingPlayerChoice: null,
+        floorStage: 'strategy',
+      }
+
+      set(nextState)
+      saveSaveSlot(buildSaveSnapshot(nextState))
+      enqueueToast(result.msg, result.effect === 'none' ? 'neutral' : 'warning')
+    },
 
     getOrderOptions: (strategyId = get().selectedStrategyId) => {
       const state = get()
@@ -817,6 +1082,20 @@ export const useGameStore = create((set, get) => {
           sellPrice: plan?.sellPrice ?? 0,
         }
       })
+    },
+
+    getOrderLimit: () => {
+      const state = get()
+      const demandEstimate = calcDemandEstimate({
+        category: state.itemCategory,
+        econPhase: state.econPhase,
+        industryTier: state.industryTier,
+        momentumMul: 1 + getMomentumEffect(state.momentum).demandMul,
+        blackSwanMul: state.activeBlackSwan?.demandMul ?? 1,
+        eventMul: getDemandMultiplier(state),
+      })
+
+      return Math.max(1, Math.round(demandEstimate * MAX_ORDER_MUL))
     },
 
     getStrategyPreview: () => {
@@ -852,7 +1131,7 @@ export const useGameStore = create((set, get) => {
         industryTier: state.industryTier,
         momentumMul: 1 + getMomentumEffect(state.momentum).demandMul,
         blackSwanMul: state.activeBlackSwan?.demandMul ?? 1,
-        eventMul: 1,
+        eventMul: getDemandMultiplier(state),
       })
       const breakdown = calcGroupDemandBreakdown({
         econPhase: state.econPhase,
@@ -867,7 +1146,7 @@ export const useGameStore = create((set, get) => {
       const predictedRevenue = predictedSales * plan.sellPrice
       const predictedCost = plan.orderQty * plan.previewUnitCost
       const fixedTotal =
-        Math.round((state.debt * state.interestRate * (state._interestMul ?? 1)) / 12) +
+        Math.round((state.debt * getEventInterestRate(state) * (state._interestMul ?? 1)) / 12) +
         (state.realty === 'monthly' ? 1000000 : 0) +
         Math.round(state.monthlyFixedCost * (state._fixedCostMul ?? 1))
       const predictedProfit = predictedRevenue - predictedCost - fixedTotal
@@ -879,20 +1158,35 @@ export const useGameStore = create((set, get) => {
     },
 
     selectStrategy: (strategyId) =>
-      set((state) => ({
-        ...state,
-        selectedStrategyId: strategyId,
-        selectedOrderTier: null,
-        currentEventResolved: false,
-        currentEventChoiceId: null,
-        lastEventResult: null,
-        floorStage: 'strategy',
-      })),
+      set((state) => {
+        if (!state.currentEventResolved) {
+          return {
+            ...state,
+            floorStage: state._eventsGeneratedFloor === state.floor ? 'event' : 'company',
+          }
+        }
+
+        return {
+          ...state,
+          selectedStrategyId: strategyId,
+          selectedOrderTier: null,
+          customOrderQty: '',
+          floorStage: 'confirm',
+        }
+      }),
 
     selectOrderTier: (orderTierId) =>
       set((state) => ({
         ...state,
         selectedOrderTier: orderTierId,
+        customOrderQty: '',
+      })),
+
+    setCustomOrderQty: (orderQty) =>
+      set((state) => ({
+        ...state,
+        selectedOrderTier: 'custom',
+        customOrderQty: orderQty,
       })),
 
     resolveEventChoice: (choiceId) => {
@@ -1066,10 +1360,14 @@ export const useGameStore = create((set, get) => {
         return
       }
 
+      const nextFloor = state.floor + 1
+      const healthBonus = nextFloor % 10 === 0 && state.companyHealth <= 5 ? 1 : 0
       const nextState = prepareNextFloorState({
         ...state,
-        floor: state.floor + 1,
+        floor: nextFloor,
         floorStage: 'market',
+        rivals: ensureRivalsJoined(state.rivals, nextFloor),
+        companyHealth: Math.min(state.maxHealth, state.companyHealth + healthBonus),
         currentRewards: [],
         rewardPending: null,
         rewardSelection: null,
@@ -1269,7 +1567,7 @@ export const useGameStore = create((set, get) => {
         industryTier: state.industryTier,
         momentumMul: 1 + getMomentumEffect(state.momentum).demandMul,
         blackSwanMul: 1,
-        eventMul: 1 + getEffectValue(stateWithEvent, 'demandMul'),
+        eventMul: getDemandMultiplier(stateWithEvent),
       })
 
       const groupBreakdown = calcGroupDemandBreakdown({
@@ -1281,7 +1579,8 @@ export const useGameStore = create((set, get) => {
       const playerDemand = groupBreakdown.salesByPlayer[0] ?? {
         totalSold: 0,
       }
-      const actualSold = Math.min(playerDemand.totalSold, plan.orderQty)
+      const actualSold =
+        (stateWithEvent._shutdownLeft ?? 0) > 0 ? 0 : Math.min(playerDemand.totalSold, plan.orderQty)
       const result = calcSettlement({
         sellPrice: plan.sellPrice,
         orderQty: plan.orderQty,
@@ -1290,8 +1589,9 @@ export const useGameStore = create((set, get) => {
         vendorUnitCost: plan.vendorUnitCost,
         qualityMode: plan.qualityMode,
         factoryActive: state.factory.built && state.factory.buildTurnsLeft <= 0,
+        eventCostMul: plan.eventCostMul,
         monthlyInterest: Math.round(
-          (state.debt * state.interestRate * (state._interestMul ?? 1)) / 12,
+          (state.debt * getEventInterestRate(stateWithEvent) * (state._interestMul ?? 1)) / 12,
         ),
         monthlyRent: state.realty === 'monthly' ? 1000000 : 0,
         safetyCost: state.factory.built && state.factory.safetyOn ? 5000000 : 0,
@@ -1339,6 +1639,7 @@ export const useGameStore = create((set, get) => {
         totalDemand,
         salesByRivalId,
         playerPrice: plan.sellPrice,
+        econPhase: state.econPhase,
       })
 
       const myShare = totalDemand > 0 ? actualSold / totalDemand : 0
@@ -1353,8 +1654,7 @@ export const useGameStore = create((set, get) => {
         advisorFee +
         salvageValue
       const nextEconPhase = advanceEconPhase(state.econPhase, state.meta.boomBonus ?? 0)
-      const rivalsAfterJoin = ensureRivalsJoined(nextRivals, state.floor + 1)
-      const biggestRival = getBiggestRival(rivalsAfterJoin)
+      const biggestRival = getBiggestRival(nextRivals)
 
       let gameStatus = 'playing'
       if (companyHealth <= 0 || nextCapital - state.debt < -30000000) {
@@ -1401,7 +1701,7 @@ export const useGameStore = create((set, get) => {
       const draftState = {
         ...state,
         screen: 'game',
-        floor: nextFloor,
+        floor: state.floor,
         gameStatus,
         floorStage: gameStatus === 'playing' ? 'settlement' : 'market',
         econPhase: nextEconPhase,
@@ -1432,9 +1732,10 @@ export const useGameStore = create((set, get) => {
         lastEventResult: null,
         selectedStrategyId: null,
         selectedOrderTier: null,
+        customOrderQty: '',
         shopPurchasesThisFloor: [],
         warningAlerts: [],
-        rivals: rivalsAfterJoin,
+        rivals: nextRivals,
         consumerGroupRatios: getConsumerGroupRatios(nextEconPhase),
         lastGroupShares: settlement.groupShares,
         lastLeftoverDemand: result.leftoverDemand,

@@ -14,7 +14,7 @@ export const STRATEGIES = {
       orderCapMul: 0.8,
       brandPenalty: { min: 1, max: 2 },
     },
-    orderRange: [0.4, 0.8],
+    orderRange: [0.4, 0.9],
   },
   branding: {
     id: 'branding',
@@ -31,7 +31,7 @@ export const STRATEGIES = {
       bepIncrease: 0.1,
       qualityPenalty: 0,
     },
-    orderRange: [0.6, 1.0],
+    orderRange: [0.5, 0.9],
   },
   dumping: {
     id: 'dumping',
@@ -48,7 +48,7 @@ export const STRATEGIES = {
       priceMul: 0.75,
       valueDemandBonus: 0.2,
     },
-    orderRange: [1.2, 1.8],
+    orderRange: [0.8, 1.2],
   },
   safe: {
     id: 'safe',
@@ -65,7 +65,7 @@ export const STRATEGIES = {
       capitalCost: 0,
       stabilityBonus: true,
     },
-    orderRange: [0.3, 0.7],
+    orderRange: [0.3, 0.6],
   },
 }
 
@@ -93,7 +93,7 @@ export const ORDER_TIER_ORDER = ['conservative', 'standard', 'aggressive']
 
 export const VENDOR = {
   name: '기본 공급사',
-  baseUnitCost: 30000,
+  baseUnitCost: 12000,
   baseQuality: 60,
 }
 
