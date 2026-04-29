@@ -111,8 +111,32 @@ function getWarningAlerts(state) {
 function getAdvisorFee(advisorId, netProfit) {
   const advisor = ADVISORS[advisorId]
   if (!advisor?.fee) {
-    return 0
-  }
+  return 0
+}
+
+function getAdvisorPassive(stateOrAdvisorId) {
+  const advisorId =
+    typeof stateOrAdvisorId === 'string' ? stateOrAdvisorId : stateOrAdvisorId?.advisor
+  return ADVISORS[advisorId]?.passive ?? {}
+}
+
+function getAdvisorMaxHealth(advisorId) {
+  return getAdvisorPassive(advisorId).maxHealth ?? MAX_HEALTH
+}
+
+function getAdvisorAttractionMultiplier(advisorId) {
+  return 1 + (getAdvisorPassive(advisorId).attractionBonus ?? 0)
+}
+
+function getAdvisorOrderCapMultiplier(advisorId) {
+  return getAdvisorPassive(advisorId).orderCapMultiplier ?? 1
+}
+
+function applyAdvisorHealthReduction(advisorId, healthDelta) {
+  const reduction = getAdvisorPassive(advisorId).healthDecreaseReduction ?? 0
+  if (healthDelta >= 0 || reduction <= 0) return healthDelta
+  return Math.min(0, healthDelta + reduction)
+}
 
   switch (advisor.fee.type) {
     case 'percent':
@@ -307,6 +331,7 @@ function createBaseState() {
 }
 
 function createRunState({ advisor, meta, legacyCards, settings, playHistory }) {
+  const advisorMaxHealth = getAdvisorMaxHealth(advisor)
   const base = applyLegacyBonuses(
     {
       ...createBaseState(),
@@ -321,6 +346,8 @@ function createRunState({ advisor, meta, legacyCards, settings, playHistory }) {
       playHistory,
       saveExists: true,
       consumerGroupRatios: getConsumerGroupRatios('stable'),
+      maxHealth: advisorMaxHealth,
+      companyHealth: advisorMaxHealth,
     },
     legacyCards,
   )
@@ -594,6 +621,33 @@ function drawOutcome(outcomes = []) {
   return outcomes[outcomes.length - 1]
 }
 
+function applyAdvisorOutcomeBonus(choice, advisorId) {
+  const passive = getAdvisorPassive(advisorId)
+  const bonus =
+    choice?.type === 'gamble'
+      ? passive.gamblingOddsBonus ?? 0
+      : choice?.type === 'absurd'
+        ? passive.absurdOddsBonus ?? 0
+        : 0
+
+  if (!bonus || !choice?.outcomes?.length) {
+    return choice?.outcomes ?? []
+  }
+
+  const [bestOutcome, ...rest] = choice.outcomes
+  const restTotal = rest.reduce((sum, outcome) => sum + outcome.p, 0)
+  const bestP = Math.min(0.95, (bestOutcome.p ?? 0) + bonus)
+  const remaining = Math.max(0.05, 1 - bestP)
+
+  return [
+    { ...bestOutcome, p: bestP },
+    ...rest.map((outcome) => ({
+      ...outcome,
+      p: restTotal > 0 ? ((outcome.p ?? 0) / restTotal) * remaining : remaining / rest.length,
+    })),
+  ]
+}
+
 function applyRewardEffect(state, reward) {
   const nextState = {
     ...state,
@@ -669,7 +723,10 @@ function composeTurnPlan(state, strategyId, orderTierId = state.selectedOrderTie
   let orderQty = 0
 
   if (orderTierId === 'custom') {
-    const maxOrderQty = Math.max(1, Math.round(demandEstimate * MAX_ORDER_MUL))
+    const maxOrderQty = Math.max(
+      1,
+      Math.round(demandEstimate * MAX_ORDER_MUL * getAdvisorOrderCapMultiplier(state.advisor)),
+    )
     orderQty = clamp(Math.round(Number(state.customOrderQty) || 0), 1, maxOrderQty)
   } else {
     const orderTier = ORDER_TIERS[orderTierId]
@@ -679,7 +736,15 @@ function composeTurnPlan(state, strategyId, orderTierId = state.selectedOrderTie
 
     const orderMul = getOrderMultipliers(strategyId)[orderTier.index] ?? 1
     const orderCapMul = strategy.effect?.orderCapMul ?? 1
-    orderQty = Math.max(12, Math.round(demandEstimate * orderMul * orderCapMul))
+    orderQty = Math.max(
+      12,
+      Math.round(
+        demandEstimate *
+          orderMul *
+          orderCapMul *
+          getAdvisorOrderCapMultiplier(state.advisor),
+      ),
+    )
   }
 
   const sellPrice = calcSellPrice(strategy, vendorUnitCost)
@@ -708,15 +773,16 @@ function buildPlayerEntry(state, plan, strategyState) {
 
   const qualityScore = Math.max(0, strategyState.qualityScore + qualityAdjustment)
   const brandValue = Math.max(0, strategyState.brandValue)
-  const attraction = calcAttraction({
-    quality: qualityScore,
-    brand: brandValue,
-    sellPrice: plan.sellPrice,
-    resistance: state.priceResistance,
-    category: state.itemCategory,
-    econPhase: state.econPhase,
-    awarenessBonus: state.marketing.awarenessBonus,
-  })
+  const attraction =
+    calcAttraction({
+      quality: qualityScore,
+      brand: brandValue,
+      sellPrice: plan.sellPrice,
+      resistance: state.priceResistance,
+      category: state.itemCategory,
+      econPhase: state.econPhase,
+      awarenessBonus: state.marketing.awarenessBonus,
+    }) * getAdvisorAttractionMultiplier(state.advisor)
 
   return {
     id: 'player',
@@ -1039,7 +1105,7 @@ export const useGameStore = create((set, get) => {
       const state = get()
       const event = state.currentPlayerEvent
       const choice = event?.choices?.find((entry) => entry.id === choiceId)
-      const result = drawOutcome(choice?.outcomes)
+      const result = drawOutcome(applyAdvisorOutcomeBonus(choice, state.advisor))
       if (!event || !choice || !result) {
         return
       }
@@ -1278,7 +1344,8 @@ export const useGameStore = create((set, get) => {
           updates.qualityScore = state.qualityScore + reward.value
           break
         case 'credit':
-          updates.credits = state.credits + reward.value
+          updates.credits =
+            state.credits + reward.value + (getAdvisorPassive(state.advisor).extraCreditPerReward ?? 0)
           break
         case 'capitalMul':
           updates.capital = Math.round(state.capital * (1 + reward.value))
@@ -1363,7 +1430,12 @@ export const useGameStore = create((set, get) => {
       }
 
       const nextFloor = state.floor + 1
-      const healthBonus = nextFloor % 10 === 0 && state.companyHealth <= 5 ? 1 : 0
+      const healthBonus =
+        getAdvisorPassive(state.advisor).healthRecoveryOnlyByCredit
+          ? 0
+          : nextFloor % 10 === 0 && state.companyHealth <= 5
+            ? 1
+            : 0
       const nextState = prepareNextFloorState({
         ...state,
         floor: nextFloor,
@@ -1622,6 +1694,7 @@ export const useGameStore = create((set, get) => {
       if (STRATEGIES[state.selectedStrategyId]?.effect?.stabilityBonus && healthDelta < 0) {
         healthDelta += 1
       }
+      healthDelta = applyAdvisorHealthReduction(state.advisor, healthDelta)
 
       const companyHealth = applyHealth(
         stateWithEvent.companyHealth,

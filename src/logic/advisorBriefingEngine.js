@@ -25,15 +25,10 @@ export function getAdvisorBriefing(advisor, econPhase, rivals = []) {
     .map((rival) => `${rival.name}: ${STRATEGY_SHORT[rival.strategy] ?? rival.strategyLabel ?? '대기'}`)
 
   const advisorNameMap = {
+    raider: 'Raider',
+    guardian: 'Guardian',
     analyst: 'Analyst',
-    quant: 'Quant',
-    strategist: 'Strategist',
-    auditor: 'Auditor',
-    economist: 'Economist',
-    venture: 'Venture',
-    arbitrageur: 'Arbitrageur',
-    actuary: 'Actuary',
-    sovereign: 'Sovereign',
+    gambler: 'Gambler',
   }
 
   const advisorPrefix = advisorNameMap[advisor] ?? 'Advisor'

@@ -1,220 +1,119 @@
 import './AdvisorSelectScreen.css'
-import {
-  ADVISORS,
-  ADVISOR_ORDER,
-  isAdvisorUnlocked,
-} from '../constants/advisors.js'
+import { ADVISORS, ADVISOR_ORDER } from '../constants/advisors.js'
 import { useGameStore } from '../store/useGameStore.js'
 
-function renderStars(value, hidden) {
-  if (hidden) {
-    return '???'
-  }
-
-  return `${'★'.repeat(value)}${'☆'.repeat(5 - value)}`
-}
-
-function getFeeLabel(advisor) {
-  if (!advisor.fee) {
-    return '없음'
-  }
-
-  if (advisor.fee.type === 'percent') {
-    return `순이익의 ${Math.round(advisor.fee.value * 100)}%`
-  }
-
-  if (advisor.fee.type === 'fixed') {
-    return `${Math.round(advisor.fee.value).toLocaleString()}원`
-  }
-
-  if (advisor.fee.type === 'creditDeduct') {
-    return `보상 Credit -${advisor.fee.value}C`
-  }
-
-  if (advisor.fee.type === 'creditAdd') {
-    return `상점 가격 +${advisor.fee.value}C`
-  }
-
-  return '없음'
-}
-
-function StatMeter({ label, value, hidden }) {
-  return (
-    <div className="cr2-advisor-scene__meter">
-      <div className="cr2-advisor-scene__meter-head">
-        <span>{label}</span>
-        <strong>{hidden ? '???' : `${value}/5`}</strong>
-      </div>
-      <div className="cr2-advisor-scene__meter-track">
-        {Array.from({ length: 5 }, (_, index) => (
-          <span
-            key={`${label}-${index}`}
-            className="cr2-advisor-scene__meter-pip"
-            data-filled={!hidden && index < value}
-          />
-        ))}
-      </div>
-    </div>
-  )
+const DETAILS = {
+  raider: {
+    passive: '매력도 x1.07',
+    buffs: ['매력도 계산 시 7% 보너스'],
+    nerfs: ['최대 체력 8'],
+    difficulty: '★★★☆',
+  },
+  guardian: {
+    passive: '손실 방어',
+    buffs: ['체력 감소량 -1'],
+    nerfs: ['발주량 상한 -10%'],
+    difficulty: '★☆☆☆',
+  },
+  analyst: {
+    passive: '정보 우위',
+    buffs: ['라이벌 정보 추가 공개', '보상 시 크레딧 +1', '국면 전환 1턴 전 예고'],
+    nerfs: ['직접 전투 보너스 없음'],
+    difficulty: '★★☆☆',
+  },
+  gambler: {
+    passive: '이벤트 한방',
+    buffs: ['도박적 선택지 확률 +15%', '말도 안 되는 선택지 대박 확률 +15%'],
+    nerfs: ['자동 체력 회복 없음'],
+    difficulty: '★★★★',
+  },
 }
 
 export function AdvisorSelectScreen() {
-  const advisorDraft = useGameStore((state) => state.advisorDraft ?? 'analyst')
-  const isAdmin = useGameStore((state) => state.auth?.isAdmin)
-  const meta = useGameStore((state) => state.meta)
-  const legacyCards = useGameStore((state) => state.legacyCards)
+  const advisorDraft = useGameStore((state) => state.advisorDraft ?? 'raider')
   const setAdvisorDraft = useGameStore((state) => state.setAdvisorDraft)
   const confirmAdvisor = useGameStore((state) => state.confirmAdvisor)
   const backToTitle = useGameStore((state) => state.backToTitle)
-
-  const selected = ADVISORS[advisorDraft] ?? ADVISORS.analyst
-  const selectedUnlocked = isAdmin || isAdvisorUnlocked(selected.id, meta, legacyCards)
+  const selected = ADVISORS[advisorDraft] ?? ADVISORS.raider
+  const selectedDetail = DETAILS[selected.id]
 
   return (
-    <main className="cr2-advisor-scene">
-      <div className="cr2-advisor-scene__shell">
-        <aside className="cr2-advisor-scene__sidebar">
-          <div className="cr2-advisor-scene__sidebar-head">
-            <p className="cr2-advisor-scene__eyebrow">Advisor Select</p>
-            <h1>어드바이저를 선택하세요</h1>
-            <p className="cr2-advisor-scene__copy">
-              이번 런의 정보력과 운영 스타일을 결정합니다.
-            </p>
-          </div>
+    <main className="cr2-advisor-starter">
+      <section className="cr2-advisor-starter__shell">
+        <header className="cr2-advisor-starter__head">
+          <p>ADVISOR SELECT</p>
+          <h1>당신의 어드바이저를 선택하세요</h1>
+        </header>
 
-          <div className="cr2-advisor-scene__roster">
-            {ADVISOR_ORDER.map((advisorId, index) => {
-              const advisor = ADVISORS[advisorId]
-              const unlocked = isAdmin || isAdvisorUnlocked(advisorId, meta, legacyCards)
+        <section className="cr2-advisor-starter__grid">
+          {ADVISOR_ORDER.map((advisorId) => {
+            const advisor = ADVISORS[advisorId]
+            const selectedCard = advisor.id === selected.id
 
-              return (
-                <button
-                  key={advisorId}
-                  type="button"
-                  className="cr2-advisor-scene__roster-item"
-                  data-selected={advisorDraft === advisorId}
-                  data-locked={!unlocked}
-                  style={{ '--cr2-advisor-color': advisor.themeColor }}
-                  onClick={() => setAdvisorDraft(advisorId)}
-                >
-                  <span className="cr2-advisor-scene__roster-index">
-                    {(index + 1).toString().padStart(2, '0')}
-                  </span>
-                  <span className="cr2-advisor-scene__roster-icon">{advisor.icon}</span>
-                  <span className="cr2-advisor-scene__roster-name">{advisor.name}</span>
-                  <span className="cr2-advisor-scene__roster-lock">
-                    {unlocked ? 'OPEN' : 'LOCK'}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-
-          <button
-            type="button"
-            className="cr2-advisor-scene__back"
-            onClick={backToTitle}
-          >
-            타이틀로 돌아가기
-          </button>
-        </aside>
+            return (
+              <button
+                key={advisor.id}
+                type="button"
+                className="cr2-advisor-starter__card"
+                data-selected={selectedCard}
+                style={{ '--cr2-advisor-color': advisor.themeColor }}
+                onMouseEnter={() => setAdvisorDraft(advisor.id)}
+                onClick={() => setAdvisorDraft(advisor.id)}
+              >
+                <strong>{advisor.name}</strong>
+                <span>{advisor.style}</span>
+                <i aria-label="TODO: replace with pixel art">{advisor.icon}</i>
+                <small>{advisor.summary}</small>
+              </button>
+            )
+          })}
+        </section>
 
         <section
-          className="cr2-advisor-scene__stage"
+          className="cr2-advisor-starter__detail"
           style={{ '--cr2-advisor-color': selected.themeColor }}
         >
-          <div className="cr2-advisor-scene__stage-top">
-            <div className="cr2-advisor-scene__stage-frame">
-              <div className="cr2-advisor-scene__portrait">
-                <div className="cr2-advisor-scene__portrait-aura" />
-                <span className="cr2-advisor-scene__portrait-icon">{selected.icon}</span>
-                <span className="cr2-advisor-scene__portrait-ring" />
-              </div>
-
-              <div className="cr2-advisor-scene__identity">
-                <div className="cr2-advisor-scene__identity-head">
-                  <p className="cr2-advisor-scene__identity-job">{selected.job}</p>
-                  <h2>{selected.name}</h2>
-                </div>
-
-                <div className="cr2-advisor-scene__identity-meta">
-                  <div>
-                    <span>수수료</span>
-                    <strong>{getFeeLabel(selected)}</strong>
-                  </div>
-                  <div>
-                    <span>난이도</span>
-                    <strong>{selectedUnlocked ? selected.difficulty : '???'}</strong>
-                  </div>
-                  <div>
-                    <span>해금 조건</span>
-                    <strong>{selected.unlockCondition}</strong>
-                  </div>
-                </div>
-
-                <blockquote className="cr2-advisor-scene__quote">
-                  {selectedUnlocked
-                    ? selected.quote
-                    : '아직 이 어드바이저는 해금되지 않았습니다.'}
-                </blockquote>
-              </div>
-            </div>
+          <div className="cr2-advisor-starter__title">
+            <strong>{selected.name}</strong>
+            <span>{selected.style}</span>
           </div>
-
-          <div className="cr2-advisor-scene__stage-bottom">
-            <section className="cr2-advisor-scene__panel">
-              <div className="cr2-advisor-scene__panel-head">
-                <span>전술 성향</span>
-                <strong>{renderStars(selected.stats.info, !selectedUnlocked)}</strong>
-              </div>
-              <div className="cr2-advisor-scene__meters">
-                <StatMeter
-                  label="정보력"
-                  value={selected.stats.info}
-                  hidden={!selectedUnlocked}
-                />
-                <StatMeter
-                  label="공격력"
-                  value={selected.stats.attack}
-                  hidden={!selectedUnlocked}
-                />
-                <StatMeter
-                  label="생존력"
-                  value={selected.stats.survival}
-                  hidden={!selectedUnlocked}
-                />
-              </div>
-            </section>
-
-            <section className="cr2-advisor-scene__panel">
-              <div className="cr2-advisor-scene__trait-block">
-                <span>패시브</span>
-                <strong>{selectedUnlocked ? selected.passive ?? '없음' : '???'}</strong>
-              </div>
-              <div className="cr2-advisor-scene__trait-block">
-                <span>특기</span>
-                <strong>{selectedUnlocked ? selected.special ?? '없음' : '???'}</strong>
-              </div>
-            </section>
+          <p>{selected.description}</p>
+          <div className="cr2-advisor-starter__passive">
+            <span>패시브</span>
+            <strong>{selectedDetail.passive}</strong>
           </div>
-
-          <div className="cr2-advisor-scene__footer">
-            <div className="cr2-advisor-scene__footer-note">
-              {selectedUnlocked
-                ? '선택 즉시 새 런이 시작됩니다.'
-                : '잠긴 어드바이저는 해금 조건을 만족하면 선택할 수 있습니다.'}
-            </div>
-            <button
-              type="button"
-              className="cr2-advisor-scene__confirm"
-              disabled={!selectedUnlocked}
-              onClick={confirmAdvisor}
-            >
-              선택 확정
-            </button>
+          <TraitList title="버프" items={selectedDetail.buffs} tone="buff" />
+          <TraitList title="너프" items={selectedDetail.nerfs} tone="nerf" />
+          <div className="cr2-advisor-starter__difficulty">
+            <span>난이도</span>
+            <strong>{selectedDetail.difficulty}</strong>
           </div>
         </section>
-      </div>
+
+        <footer className="cr2-advisor-starter__actions">
+          <button type="button" className="cr2-advisor-starter__back" onClick={backToTitle}>
+            타이틀로
+          </button>
+          <button type="button" className="cr2-advisor-starter__confirm" onClick={confirmAdvisor}>
+            이 어드바이저로 시작
+          </button>
+        </footer>
+      </section>
     </main>
+  )
+}
+
+function TraitList({ title, items, tone }) {
+  return (
+    <div className="cr2-advisor-starter__traits">
+      <span>{title}</span>
+      <ul>
+        {items.map((item) => (
+          <li key={item} data-tone={tone}>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }

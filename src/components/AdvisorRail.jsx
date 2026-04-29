@@ -3,13 +3,6 @@ import { ADVISOR_ORDER, ADVISORS } from '../constants/advisors.js'
 import { formatCurrency } from '../lib/formatters.js'
 import { useGameStore } from '../store/useGameStore.js'
 
-const ADVISOR_ACCENTS = {
-  analyst: '#60A5FA',
-  hustler: '#F97316',
-  oracle: '#A78BFA',
-  engineer: '#34D399',
-}
-
 export function AdvisorRail() {
   const advisor = useGameStore((state) => state.advisor)
   const capital = useGameStore((state) => state.capital)
@@ -52,7 +45,7 @@ export function AdvisorRail() {
         {ADVISOR_ORDER.map((advisorId) => {
           const definition = ADVISORS[advisorId]
           const selected = advisorId === advisor
-          const accent = ADVISOR_ACCENTS[advisorId]
+          const accent = definition.themeColor
 
           return (
             <button
@@ -83,7 +76,7 @@ export function AdvisorRail() {
         <div className="cr2-sidebar__summary">
           <div
             className="cr2-sidebar__focus"
-            style={{ '--cr2-advisor-accent': ADVISOR_ACCENTS[activeAdvisor.id] }}
+            style={{ '--cr2-advisor-accent': activeAdvisor.themeColor }}
           >
             <p className="cr2-sidebar__label">현재 조언자</p>
             <strong>{activeAdvisor.name}</strong>
